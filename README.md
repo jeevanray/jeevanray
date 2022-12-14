@@ -1,4 +1,4 @@
-- 👋 Hi, I’m @jeevanray working as Equipment Design Engineer/Python Developer.
+- 👋 Hi, I’m @jeevanray working as Python Developer/Design Engineer.
 - 👀 I’m interested in Machine Learning to create stuff which can be used in real life world.
 - 🌱 I’m currently learning Computer vision with openCV & Excel Automation.
 - 💞️ I’m looking to collaborate on any projects related to python to hone my programming skills.
