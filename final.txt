@@ -1,0 +1,2816 @@
+# Source Generated with Decompyle++
+# File: scalperV4.pyc.structed.pyc (Python 3.10)
+
+import sys
+from PyQt5.uic import loadUi
+from PyQt5 import QtWidgets
+from PyQt5 import QtCore
+from PyQt5.QtWidgets import QDialog, QApplication, QAbstractItemView, QGridLayout, QTableWidgetItem
+from PyQt5.QtGui import QPixmap, QColor
+from home import Ui_Dialog
+from register import Ui_Dialog2
+from login import Ui_Dialog3
+from controlPanel import Ui_Dialog4
+from api_helper import ShoonyaApiPy, get_time
+import sqlite3
+import os
+import time
+import threading
+from functools import partial
+import time
+from datetime import datetime, timedelta
+from dateutil.relativedelta import relativedelta
+import pyqtgraph as pg
+import math
+import random
+import requests
+QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_EnableHighDpiScaling, True)
+QtWidgets.QApplication.setAttribute(QtCore.Qt.AA_UseHighDpiPixmaps, True)
+
+class WelcomeScreen(QDialog):
+    
+    def __init__(self = None):
+        super(WelcomeScreen, self).__init__()
+        self.ui = Ui_Dialog()
+        self.ui.setupUi(self)
+        self.ui.login.clicked.connect(self.gotologin)
+        self.ui.signup.clicked.connect(self.gotologin2)
+
+    
+    def gotologin(self):
+        self.checkLogin()
+
+    
+    def checkLogin(self):
+        
+        try:
+            conn = sqlite3.connect('mkcodez.db')
+            cur = conn.cursor()
+            cur.execute('select * from mkAPI')
+            rows = cur.fetchall()
+            email = ''
+            password = ''
+            if len(rows) > 0:
+                email = rows[0][6]
+                password = rows[0][7]
+            url = 'http://68.178.166.108:3000/getApi/getUser'
+            myobj = {
+                'email': email,
+                'pass': password,
+                'broker': 'finvasia' }
+            x = requests.post(url, myobj, **('json',))
+            if x.json()[0] == 1:
+                if x.json()[1] == True or x.json()[2] == True or x.json()[3] == 'PREMIUM':
+                    login = LoginScreen()
+                    widget.addWidget(login)
+                    widget.setCurrentIndex(widget.currentIndex() + 1)
+                return None
+            if None.json()[1] == False:
+                error_dialog = QtWidgets.QErrorMessage()
+                error_dialog.showMessage('INVALID CREDENTIALS')
+                retval = error_dialog.exec_()
+        finally:
+            return None
+            error_dialog = QtWidgets.QErrorMessage()
+            error_dialog.showMessage('PLAN EXPIRED')
+            retval = error_dialog.exec_()
+            return None
+            error_dialog = QtWidgets.QErrorMessage()
+            error_dialog.showMessage('USER NOT FOUND')
+            retval = error_dialog.exec_()
+            return None
+            error_dialog = QtWidgets.QErrorMessage()
+            error_dialog.showMessage('COULD NOT CONNECT TO SERVER')
+            retval = error_dialog.exec_()
+            return None
+
+
+    
+    def gotologin2(self):
+        login = RegisterScreen()
+        widget.addWidget(login)
+        widget.setCurrentIndex(widget.currentIndex() + 1)
+
+    __classcell__ = None
+
+
+class RegisterScreen(QDialog):
+    
+    def __init__(self = None):
+        super(RegisterScreen, self).__init__()
+        self.ui = Ui_Dialog2()
+        self.ui.setupUi(self)
+        self.ui.createdb_2.clicked.connect(self.createDB)
+        self.ui.deletedb_2.clicked.connect(self.deleteDB)
+
+    
+    def createDB(self):
+        conn = sqlite3.connect('mkcodez.db')
+    # WARNING: Decompyle incomplete
+
+    
+    def deleteDB(self):
+        pass
+    # WARNING: Decompyle incomplete
+
+    __classcell__ = None
+
+
+class LoginScreen(QDialog):
+    
+    def __init__(self = None):
+        super(LoginScreen, self).__init__()
+        self.ui = Ui_Dialog3()
+        self.ui.setupUi(self)
+        self.ui.loginSuccess.clicked.connect(self.connectBroker)
+
+    
+    def connectBroker(self):
+        global expiries, allTokens, optionTokens, tableTokens, tableTokens2, controls, api, indexToken, niftyLtp, hisData
+        expiries = []
+        allTokens = { }
+        optionTokens = { }
+        tableTokens = { }
+        tableTokens2 = { }
+        controls = {
+            'rrValues': { },
+            'pnl': { },
+            'ALL_STRAT': [],
+            'pool': { } }
+        api = ShoonyaApiPy()
+        conn = sqlite3.connect('mkcodez.db')
+        cur = conn.cursor()
+        cur.execute('select * from mkAPI')
+        rows = cur.fetchall()
+        userid = ''
+        password = ''
+        twoFA = ''
+        vendor_code = ''
+        api_secret = ''
+        imei = ''
+        if len(rows) > 0:
+            userid = rows[0][1]
+            password = rows[0][5]
+            vendor_code = rows[0][3]
+            api_secret = rows[0][2]
+            imei = rows[0][4]
+        conn.close()
+        ret1 = None
+        ret1 = api.login(userid, password, self.ui.passWord.text(), vendor_code, api_secret, imei, **('userid', 'password', 'twoFA', 'vendor_code', 'api_secret', 'imei'))
+        if ret1 == None:
+            sys.exit()
+        indexToken = {
+            'NIFTY': '26000',
+            'BANKNIFTY': '26009' }
+        exch = 'NFO'
+        query = 'NIFTY FUT'
+        ret = api.searchscrip(exch, query, **('exchange', 'searchtext'))
+        if ret != None:
+            symbols = ret['values']
+            for symbol in symbols:
+                indexToken['NIFTY FUT'] = symbol['token']
+                query = 'BANKNIFTY FUT'
+                ret = api.searchscrip(exch, query, **('exchange', 'searchtext'))
+                if ret != None:
+                    symbols = ret['values']
+                    for symbol in symbols:
+                        indexToken['BANKNIFTY FUT'] = symbol['token']
+                        ret = api.get_quotes('NSE', '26000', **('exchange', 'token'))
+                        lastPrice = int(float(ret['lp']))
+                        lastPrice = lastPrice - lastPrice % 100
+                        niftyLtp = lastPrice
+                        exch = 'NFO'
+                        query = 'nifty ' + str(lastPrice)
+                        ret = api.searchscrip(exch, query, **('exchange', 'searchtext'))
+                        prevSymbol = ''
+                        if ret != None:
+                            symbols = ret['values']
+                            for symbol in symbols:
+                                if symbol['dname'].split()[1] != prevSymbol:
+                                    prevSymbol = symbol['dname'].split()[1]
+                                    expiries.append(symbol['dname'].split()[1])
+                                if len(expiries) >= 4:
+                                    pass
+                                
+                                hisData = { }
+                                instruments = []
+                                for val in indexToken:
+                                    end_time = time.time()
+                                    start_time = end_time - 604800
+                                    exchange = 'NSE'
+                                    if val.endswith('FUT'):
+                                        exchange = 'NFO'
+                                    tempData = api.get_time_price_series(exchange, indexToken[val], start_time, end_time, '1', **('exchange', 'token', 'starttime', 'endtime', 'interval'))
+                                    hisData[indexToken[val]] = {
+                                        'status': 'None',
+                                        'temp': [],
+                                        'time': '',
+                                        'data': tempData }
+                                self.controlPanel()
+                                return None
+
+    
+    def controlPanel(self):
+        control = ControlScreen()
+        widget.addWidget(control)
+        widget.setCurrentIndex(widget.currentIndex() + 1)
+
+    __classcell__ = None
+
+
+class ControlScreen(QDialog):
+    quickTokens = []
+    formats = '%d-%m-%Y %H:%M:%S'
+    allThemes = {
+        'NO STYLE': {
+            'backColor': 'white' },
+        'BLUE': {
+            'backColor': 'black' },
+        'GREEN': {
+            'backColor': 'black' },
+        'RED': {
+            'backColor': 'black' },
+        'PINK': {
+            'backColor': 'black' },
+        'YELLOW': {
+            'backColor': 'black' },
+        'LBLUE': {
+            'backColor': '#BAF7F4' },
+        'LGREEN': {
+            'backColor': '#5ED9A7' },
+        'LPINK': {
+            'backColor': '#EFBCED' },
+        'LRED': {
+            'backColor': '#F27D65' },
+        'LYELLOW': {
+            'backColor': '#ECE574' } }
+    
+    def __init__(self = None):
+        global liveOI, indicatorStatus, refreshAllPnl, restartPnlTable, oiGenerated, oiRequested, stratError, updateStrategyTableRequest, SErrorMsg, oiRequest, oiTableStart, liveLtp, webData, tokenCache, oiCache, socket_opened, layout, layout2, layout3, layout4, layout5, layout6, strategyControl, positionControl, fws
+        super(ControlScreen, self).__init__()
+        self.ui = Ui_Dialog4()
+        self.ui.setupUi(self)
+        liveOI = { }
+        indicatorStatus = { }
+        refreshAllPnl = False
+        restartPnlTable = False
+        oiGenerated = False
+        oiRequested = False
+        stratError = None
+        updateStrategyTableRequest = False
+        SErrorMsg = False
+        oiRequest = False
+        oiTableStart = False
+        liveLtp = { }
+        webData = { }
+        tokenCache = { }
+        oiCache = { }
+        socket_opened = False
+        self.cceSl = 0
+        self.cpeSl = 0
+        self.cceTgt = 0
+        self.cpeTgt = 0
+        None((lambda : self.placeOrder(self, 'CE', self.ui.ceStrike.text(), 'BUY', False)))
+        None((lambda : self.placeOrder(self, 'PE', self.ui.peStrike.text(), 'BUY', False)))
+        None((lambda : self.placeOrder(self, 'CE', self.ui.ceStrike.text(), 'SELL', False)))
+        None((lambda : self.placeOrder(self, 'PE', self.ui.peStrike.text(), 'SELL', False)))
+        None((lambda : self.addToScan('CE')))
+        None((lambda : self.addToScan('PE')))
+        self.ui.exitOrder.clicked.connect(self.exitTrigger)
+        self.ui.pushButton_9.clicked.connect(self.exitAllTrigger)
+        self.ui.updateRisk.clicked.connect(self.updateRiskReward)
+        self.ui.openButton.clicked.connect(self.openOrders)
+        self.ui.checkIndicator.clicked.connect(self.refreshIndicators)
+        self.ui.stopIndicator.clicked.connect(self.stopIndicators)
+        self.ui.checkIndButton.clicked.connect(self.updateIndicatorTable)
+        self.ui.pushButton.clicked.connect(self.deleteIndicator)
+        self.ui.cancelButton.clicked.connect(self.cancelOrders)
+        self.ui.modifyButton.clicked.connect(self.modifyOrders)
+        self.ui.pushButton_20.clicked.connect(self.cancelAllOrders)
+        None((lambda : self.addToScan2('CE')))
+        None((lambda : self.addToScan2('PE')))
+        self.ui.viewOiData.clicked.connect(self.oiThread)
+        self.ui.oiBuildup.clicked.connect(self.oiBuildupData)
+        self.ui.updateStrategy.clicked.connect(self.updateStrategyFields)
+        None((lambda : self.indexValue(self.ui.ceIndexSl, self.ui.ceSlValue, 'CE', 'SL')))
+        None((lambda : self.indexValue(self.ui.ceIndexTarget, self.ui.ceTargetValue, 'CE', '')))
+        None((lambda : self.indexValue(self.ui.peIndexSl, self.ui.peSlValue, 'PE', 'SL')))
+        None((lambda : self.indexValue(self.ui.peIndexTarget, self.ui.peTargetValue, 'PE', '')))
+        None((lambda : self.indexValue(self.ui.ce2IndexTarget, self.ui.ce2TargetValue, 'CE', '')))
+        None((lambda : self.indexValue(self.ui.pe2IndexTarget, self.ui.pe2TargetValue, 'PE', '')))
+        self.ui.optionChain.clicked.connect(self.updateSettings)
+        self.ui.listWidget.itemClicked.connect(self.selectSpread)
+        self.ui.pushButton_5.clicked.connect(self.addSpreads)
+        self.ui.pushButton_11.clicked.connect(self.poolOrder)
+        self.ui.pushButton_7.clicked.connect(partial(self.quickOrder, 'ATMC'))
+        self.ui.pushButton_8.clicked.connect(partial(self.quickOrder, 'ITMC'))
+        self.ui.pushButton_13.clicked.connect(partial(self.quickOrder, 'OTMC'))
+        self.ui.pushButton_14.clicked.connect(partial(self.quickOrder, 'ATMP'))
+        self.ui.pushButton_12.clicked.connect(partial(self.quickOrder, 'ITMP'))
+        self.ui.pushButton_10.clicked.connect(partial(self.quickOrder, 'OTMP'))
+        self.ui.stratSave.clicked.connect(self.addStrategy)
+        self.ui.pushButton_2.clicked.connect(self.deleteStrategy)
+        self.ui.delAllStrategy.clicked.connect(self.deleteAllStrategy)
+        None((lambda : self.deleteSelectedStrategy(self.ui.strategyTable.currentRow())))
+        self.ui.buildupTable_2.hide()
+        self.ui.stopIndicator.setEnabled(False)
+        for value in expiries:
+            self.ui.expiry.addItem(value)
+            self.ui.oiExpiry.addItem(value)
+            self.ui.comboBox_7.addItem(value)
+        self.ui.oiStrikes.setValue(niftyLtp)
+        self.ui.spinBox_2.setValue(niftyLtp)
+        self.ui.horizontalSlider.setMinimum(niftyLtp - 1500)
+        self.ui.horizontalSlider.setMaximum(niftyLtp + 1500)
+        self.ui.horizontalSlider.setValue(niftyLtp)
+        self.ui.label_25.setText(str(niftyLtp))
+        self.ui.oiStrikes.setSingleStep(50)
+        None((lambda : self.text_changed('NIFTY')))
+        None((lambda : self.text_changed('BANKNIFTY')))
+        self.ui.tabWidget_4.currentChanged.connect(self.getIndex)
+        self.ui.pushButton_18.clicked.connect(self.addtoDB)
+        self.ui.pushButton_19.clicked.connect(self.importDb)
+        self.ui.pushButton_21.clicked.connect(self.deleteImport)
+        self.ui.comboBox_6.currentTextChanged.connect(self.spreadIndex)
+        self.ui.pushButton_6.clicked.connect(self.clearStrategies)
+        self.ui.pushButton_16.clicked.connect(self.deleteOpstra)
+        self.ui.pushButton_15.clicked.connect(self.refreshOpstra)
+        self.ui.comboBox_7.currentTextChanged.connect(self.spreadIndex)
+        self.ui.horizontalSlider.valueChanged.connect(self.optionProfit)
+        self.ui.selTheme.currentTextChanged.connect(self.selectTheme)
+        self.ui.font.currentTextChanged.connect(self.selectTheme)
+        self.ui.oiIndex.currentTextChanged.connect(self.oiIndexChanged)
+        None((lambda : self.displayStrat(self.ui.comboBox, self.ui.lineEdit)))
+        None((lambda : self.displayStrat(self.ui.comboBox_2, self.ui.lineEdit_2)))
+        None((lambda : self.indicatorDetails(self.ui.comboBox_4)))
+        None((lambda : self.indicatorDetails(self.ui.comboBox_4)))
+        None((lambda : self.selectedStrike('NIFTY')))
+        None((lambda : self.selectedStrike('BANKNIFTY')))
+        self.ui.strategyTable.cellClicked.connect(self.selectedStrategy)
+        self.ui.buildupTable.cellClicked.connect(self.selectedOI)
+        self.ui.stopAlgo.clicked.connect(self.stopFunc)
+        self.ui.pushButton_3.clicked.connect(self.resizeFunc)
+        self.ui.optionTable.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.ui.optionTable_3.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.ui.positionTable.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.ui.openTable.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.ui.indicatorTable.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.ui.buildupTable.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.ui.buildupTable_2.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.ui.strategyTable.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.ui.buildupTable_3.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.ui.buildupTable_4.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.ui.positionTable.cellClicked.connect(self.selectPosition)
+        self.ui.openTable.cellClicked.connect(self.selectedOrders)
+        self.ui.checkBox_17.stateChanged.connect(self.updateActive)
+        self.ui.disStrategy.stateChanged.connect(self.enableStrategy)
+        self.ui.disIndicator.stateChanged.connect(self.enableIndicator)
+        self.ui.frame.hide()
+        self.ui.widget_6.hide()
+        self.curr_time = QtCore.QTime(0, 0, 0)
+        layout = QGridLayout()
+        layout2 = QGridLayout()
+        layout3 = QGridLayout()
+        layout4 = QGridLayout()
+        layout5 = QGridLayout()
+        layout6 = QGridLayout()
+        self.ui.widget.setLayout(layout)
+        self.ui.widget_2.setLayout(layout2)
+        self.ui.widget_3.setLayout(layout3)
+        self.ui.widget_4.setLayout(layout4)
+        self.ui.widget_5.setLayout(layout5)
+        self.ui.widget_7.setLayout(layout6)
+        self.ui.positionTable.setColumnWidth(0, 200)
+        self.ui.positionTable.setColumnWidth(1, 90)
+        self.ui.positionTable.setColumnWidth(2, 90)
+        self.ui.positionTable.setColumnWidth(3, 65)
+        self.ui.positionTable.setColumnWidth(4, 90)
+        self.ui.positionTable.setColumnWidth(5, 90)
+        self.ui.positionTable.setColumnWidth(6, 90)
+        self.ui.positionTable.setColumnWidth(7, 95)
+        self.ui.positionTable.setColumnWidth(8, 80)
+        self.ui.strategyTable.setColumnWidth(0, 220)
+        self.ui.strategyTable.setColumnWidth(2, 170)
+        self.ui.buildupTable_3.setColumnWidth(0, 220)
+        self.ui.buildupTable_4.setColumnWidth(0, 220)
+        self.ui.buildupTable_3.setColumnWidth(5, 220)
+        self.ui.buildupTable_4.setColumnWidth(5, 220)
+        self.ui.indicatorTable.setColumnWidth(2, 250)
+        self.ui.strategyTable.setColumnWidth(0, 300)
+        if self.ui.disStrategy.isChecked() == False:
+            strategyControl = Strategy(self, False)
+            strategyControl.start()
+        positionControl = pnl(self, False)
+        positionControl.start()
+        self.applySettings()
+        self.timer = QtCore.QTimer()
+        self.timer.timeout.connect(self.chartData)
+        self.timer.start(int(self.ui.doubleSpinBox_2.value() * 1000))
+    # WARNING: Decompyle incomplete
+
+    
+    def keyPressEvent(self, event):
+        print(event)
+
+    
+    def getIndex(self):
+        if self.ui.tabWidget_4.currentIndex() == 0:
+            self.ui.ceQty.setSingleStep(50)
+            self.ui.ceQty.setMinimum(50)
+            qty = self.ui.ceQty.value()
+            qty = qty - qty % 50
+            self.ui.ceQty.setValue(qty)
+            self.ui.peQty.setSingleStep(50)
+            self.ui.peQty.setMinimum(50)
+            qty = self.ui.peQty.value()
+            qty = qty - qty % 50
+            self.ui.peQty.setValue(qty)
+            self.ui.ceHalfQty.setSingleStep(50)
+            self.ui.ceHalfQty.setMinimum(50)
+            qty = self.ui.ceHalfQty.value()
+            qty = qty - qty % 50
+            self.ui.ceHalfQty.setValue(qty)
+            self.ui.peHalfQty.setSingleStep(50)
+            self.ui.peHalfQty.setMinimum(50)
+            qty = self.ui.peHalfQty.value()
+            qty = qty - qty % 50
+            self.ui.peHalfQty.setValue(qty)
+            return None
+        if None.ui.tabWidget_4.currentIndex() == 1:
+            self.ui.ceQty.setSingleStep(25)
+            self.ui.ceQty.setMinimum(25)
+            self.ui.peQty.setSingleStep(25)
+            self.ui.peQty.setMinimum(25)
+            self.ui.ceHalfQty.setSingleStep(25)
+            self.ui.ceHalfQty.setMinimum(25)
+            self.ui.peHalfQty.setSingleStep(25)
+            self.ui.peHalfQty.setMinimum(25)
+            return None
+
+    
+    def addtoDB(self):
+        conn = sqlite3.connect('mkcodez.db')
+    # WARNING: Decompyle incomplete
+
+    
+    def importDb(self):
+        conn = sqlite3.connect('mkcodez.db')
+        cur = conn.cursor()
+        cur.execute('select * from position')
+        rows = cur.fetchall()
+    # WARNING: Decompyle incomplete
+
+    
+    def deleteImport(self):
+        conn = sqlite3.connect('mkcodez.db')
+    # WARNING: Decompyle incomplete
+
+    
+    def enableStrategy(self):
+        global strategyControl
+        if self.ui.disStrategy.isChecked() == True:
+            strategyControl.exitFlag = True
+            return None
+        strategyControl = None(self, False)
+        strategyControl.start()
+
+    
+    def enableIndicator(self):
+        if self.ui.disIndicator.isChecked() == False:
+            for val in indexToken:
+                end_time = time.time()
+                start_time = end_time - 604800
+                exchange = 'NSE'
+                if val.endswith('FUT'):
+                    exchange = 'NFO'
+                tempData = api.get_time_price_series(exchange, indexToken[val], start_time, end_time, '1', **('exchange', 'token', 'starttime', 'endtime', 'interval'))
+                hisData[indexToken[val]] = {
+                    'status': 'None',
+                    'temp': [],
+                    'time': '',
+                    'data': tempData }
+        return None
+
+    
+    def resizeFunc(self):
+        if self.ui.pushButton_3.text() == '^':
+            self.ui.tabWidget_4.hide()
+            self.ui.pushButton_3.setText('v')
+            widget.setFixedHeight(425)
+            widget.setFixedWidth(1041)
+            return None
+        None.ui.tabWidget_4.show()
+        self.ui.pushButton_3.setText('^')
+        widget.setFixedHeight(700)
+        widget.setFixedWidth(1041)
+
+    
+    def valuechange(self):
+        strike = ''
+    # WARNING: Decompyle incomplete
+
+    
+    def selectTheme(self):
+        theme = self.ui.selTheme.currentText()
+        if theme != 'NO STYLE':
+            allThemes = {
+                'BLUE': {
+                    'backColor': 'black',
+                    'foreColor': 'white',
+                    'primColor': '#2F3C7E',
+                    'secColor': '#2F3C7E',
+                    'hoverColor': '#218295' },
+                'GREEN': {
+                    'backColor': 'black',
+                    'foreColor': 'white',
+                    'primColor': '#074524',
+                    'secColor': '#074524',
+                    'hoverColor': 'green' },
+                'RED': {
+                    'backColor': 'black',
+                    'foreColor': 'white',
+                    'primColor': '#9B080D',
+                    'secColor': '#9B080D',
+                    'hoverColor': '#F0888C' },
+                'PINK': {
+                    'backColor': 'black',
+                    'foreColor': 'white',
+                    'primColor': '#790A67',
+                    'secColor': '#790A67',
+                    'hoverColor': '#E18AD3' },
+                'YELLOW': {
+                    'backColor': 'black',
+                    'foreColor': 'white',
+                    'primColor': '#9FA609',
+                    'secColor': '#9FA609',
+                    'hoverColor': '#525511' },
+                'LBLUE': {
+                    'backColor': '#BAF7F4',
+                    'foreColor': 'black',
+                    'primColor': '#18A7A0',
+                    'secColor': '#18A7A0',
+                    'hoverColor': '#18A7A0' },
+                'LGREEN': {
+                    'backColor': '#5ED9A7',
+                    'foreColor': 'black',
+                    'primColor': '#17AC6F',
+                    'secColor': '#17AC6F',
+                    'hoverColor': '#28913C' },
+                'LPINK': {
+                    'backColor': '#EFBCED',
+                    'foreColor': 'black',
+                    'primColor': '#F34FED',
+                    'secColor': '#F34FED',
+                    'hoverColor': '#EC1DD3' },
+                'LRED': {
+                    'backColor': '#F27D65',
+                    'foreColor': 'black',
+                    'primColor': '#F13711',
+                    'secColor': '#F13711',
+                    'hoverColor': '#C65F51' },
+                'LYELLOW': {
+                    'backColor': '#ECE574',
+                    'foreColor': 'black',
+                    'primColor': '#CDC20B',
+                    'secColor': '#CDC20B',
+                    'hoverColor': '#ACA426' } }
+            backColor = allThemes[theme]['backColor']
+            foreColor = allThemes[theme]['foreColor']
+            primColor = allThemes[theme]['primColor']
+            secColor = allThemes[theme]['secColor']
+            hoverColor = allThemes[theme]['hoverColor']
+            font = self.ui.font.currentText()
+            pfont = str(int(font.replace('pt', '')) + 3) + 'pt'
+            style = 'QWidget{background-color: ' + backColor + ';font: ' + font + " 'Arial';color:" + foreColor + ';}QLabel{color:' + foreColor + ';}QLineEdit#profitBox{font: 87 ' + pfont + " 'Arial Black';}QTabBar::tab {background: " + backColor + '; border: 1px solid ' + primColor + '; padding: 5px;} QTabWidget::pane {border: 1px solid ' + primColor + ';   top:-1px;   background:' + backColor + ';} QTabBar::tab:selected {   background:' + primColor + ';   margin-bottom: -1px; }QTabBar::tab:hover {   background: ' + hoverColor + ' }QPushButton {    background-color: ' + secColor + ';    color: #FFFFFF;    border-style: outset;    padding: 2px;}QPushButton:hover { background: ' + hoverColor + ' }QDoubleSpinBox{border : 2px solid ' + primColor + ';background : ' + backColor + ';}QDoubleSpinBox::hover{border : 2px solid ' + primColor + ';background :' + hoverColor + ';}QSpinBox{border : 2px solid ' + primColor + ';background : ' + backColor + ';}QSpinBox::hover{border : 2px solid ' + primColor + ';background :' + hoverColor + ';}QTimeEdit{border : 2px solid ' + primColor + ';background : ' + backColor + ';}QTimeEdit::hover{border : 2px solid ' + primColor + ';background :' + hoverColor + ';}QCheckBox::indicator{border : 3px solid ' + primColor + ';}QCheckBox::indicator:checked { background: ' + foreColor + '; }QCheckBox::hover{background-color : ' + hoverColor + ';   }QRadioButton::indicator {border: 2px solid ' + primColor + ';  } QRadioButton::indicator:checked { background: ' + foreColor + '; }QRadioButton::hover{background-color : ' + hoverColor + ';   }Line{background-color: rgba(0, 0, 0,0);}QComboBox{background-color: ' + primColor + '; border-radius:2px;padding:2px;}QComboBox:hover{background-color:' + hoverColor + '}QHeaderView::section{background-color:' + primColor + ';}QLineEdit{color:' + foreColor + ';border: 1px solid ' + primColor + '; }QLineEdit:hover{background-color:' + hoverColor + ';}QTabWidget#tabWidget_3 QStackedWidget > QWidget{background-color: ' + backColor + ';color:' + foreColor + '}'
+            self.ui.tabWidget.setStyleSheet(style)
+            return None
+        None.ui.tabWidget.setStyleSheet(None)
+
+    
+    def deleteAllStrategy(self):
+        if len(controls['ALL_STRAT']) > 0:
+            del controls['ALL_STRAT'][0]
+            if not len(controls['ALL_STRAT']) > 0:
+                self.updateStrategyTable()
+                return None
+
+    
+    def deleteSelectedStrategy(self, loc):
+        del controls['ALL_STRAT'][loc]
+        self.updateStrategyTable()
+
+    
+    def selectedStrategy(self):
+        self.ui.stratEdit.setText(self.ui.strategyTable.item(self.ui.strategyTable.currentRow(), 0).text())
+        if self.ui.strategyTable.item(self.ui.strategyTable.currentRow(), 5).text() == 'True':
+            self.ui.checkBox_17.setChecked(True)
+        else:
+            self.ui.checkBox_17.setChecked(False)
+        self.ui.widget_6.show()
+
+    
+    def updateStrategyFields(self):
+        
+        try:
+            self.ui.strategyTable.setItem(self.ui.strategyTable.currentRow(), 0, QTableWidgetItem(self.ui.stratEdit.text()))
+            controls['ALL_STRAT'][self.ui.strategyTable.currentRow()]['strategy'] = self.ui.stratEdit.text()
+            self.ui.stratEdit.setText('')
+            self.ui.widget_6.hide()
+        finally:
+            return None
+            error_dialog = QtWidgets.QErrorMessage()
+            error_dialog.showMessage('Invalid Strategy!!!')
+            retval = error_dialog.exec_()
+            return None
+
+
+    
+    def updateActive(self):
+        if self.ui.checkBox_17.isChecked() == True:
+            controls['ALL_STRAT'][self.ui.strategyTable.currentRow()]['active'] = True
+        else:
+            controls['ALL_STRAT'][self.ui.strategyTable.currentRow()]['active'] = False
+        self.updateStrategyTable()
+
+    
+    def exitTrigger(self):
+        exitStrike = self.ui.positionTable.item(self.ui.positionTable.currentRow(), 0).text()
+        trantype = controls['pnl'][exitStrike]['trantype']
+        qty = self.ui.positionTable.item(self.ui.positionTable.currentRow(), 2).text()
+        ltp = getLtp(exitStrike)
+        positionControl.exitOrder(trantype, exitStrike, int(float(controls['pnl'][exitStrike]['quantity'])), controls['pnl'][exitStrike]['limittarget'], float(controls['pnl'][exitStrike]['buffer']), ltp, 'FORCED', controls['pnl'][exitStrike]['cptype'], controls['pnl'][exitStrike]['ordType'])
+
+    
+    def exitAllTrigger(self):
+        pass
+    # WARNING: Decompyle incomplete
+
+    
+    def displayStrat(self, inputs, outputs):
+        conn = sqlite3.connect('mkcodez.db')
+        cur = conn.cursor()
+        cur.execute("select * from strategy where name='" + inputs.currentText() + "'")
+        rows = cur.fetchall()
+        for row in rows:
+            outputs.setText(row[1])
+
+    
+    def updateSettings(self):
+        conn = sqlite3.connect('mkcodez.db')
+    # WARNING: Decompyle incomplete
+
+    
+    def addStrategy(self):
+        strategyName = self.ui.stratName.text()
+        strategyDetails = self.ui.strategyTable.item(self.ui.strategyTable.currentRow(), 0).text()
+        strategyTime = self.ui.strategyTable.item(self.ui.strategyTable.currentRow(), 1).text()
+        conn = sqlite3.connect('mkcodez.db')
+    # WARNING: Decompyle incomplete
+
+    
+    def deleteStrategy(self):
+        strategyName = self.ui.comboBox_3.currentText()
+        conn = sqlite3.connect('mkcodez.db')
+        
+        try:
+            conn.execute("DELETE from strategy where name='" + strategyName + "'")
+            conn.commit()
+        finally:
+            pass
+        error = True
+        conn.close()
+        self.refreshonUpdate()
+        return None
+
+
+    
+    def applySettings(self):
+        conn = sqlite3.connect('mkcodez.db')
+        cur = conn.cursor()
+        cur.execute('select * from config')
+        rows = cur.fetchall()
+        if len(rows) > 0:
+            self.ui.entryLimit.setChecked(self.realValue(rows[0][0]))
+            self.ui.limitSl.setChecked(self.realValue(rows[0][1]))
+            self.ui.limitTarget.setChecked(self.realValue(rows[0][2]))
+            self.ui.buffer.setValue(float(rows[0][3]))
+            self.ui.trail.setChecked(self.realValue(rows[0][4]))
+            self.ui.trailValue.setValue(float(rows[0][5]))
+            self.ui.sellQuick.setChecked(self.realValue(rows[0][6]))
+            self.ui.ceLimit.setChecked(self.realValue(rows[0][7]))
+            self.ui.peLimit.setChecked(self.realValue(rows[0][8]))
+            self.ui.sellQuick.setChecked(self.realValue(rows[0][9]))
+            self.ui.ceSl.setChecked(self.realValue(rows[0][10]))
+            self.ui.ceIndexSl.setChecked(self.realValue(rows[0][11]))
+            self.ui.ceSlValue.setValue(float(rows[0][12]))
+            self.cceSl = float(rows[0][12])
+            self.ui.peSl.setChecked(self.realValue(rows[0][13]))
+            self.ui.peIndexSl.setChecked(self.realValue(rows[0][14]))
+            self.ui.peSlValue.setValue(float(rows[0][15]))
+            self.cpeSl = float(rows[0][15])
+            self.ui.ceTarget.setChecked(self.realValue(rows[0][16]))
+            self.ui.ceIndexTarget.setChecked(self.realValue(rows[0][17]))
+            self.ui.ceTargetValue.setValue(float(rows[0][18]))
+            self.cceTgt = float(rows[0][18])
+            self.ui.peTarget.setChecked(self.realValue(rows[0][19]))
+            self.ui.peIndexTarget.setChecked(self.realValue(rows[0][20]))
+            self.ui.peTargetValue.setValue(float(rows[0][21]))
+            self.cpeTgt = float(rows[0][21])
+            self.ui.spinBox.setValue(int(rows[0][22]))
+            self.ui.timeframe.setCurrentText(rows[0][23])
+            self.ui.font.setCurrentText(rows[0][25])
+            self.ui.selTheme.setCurrentText(rows[0][24])
+            self.ui.oi.setChecked(rows[0][26])
+            self.ui.normalOrder.setChecked(rows[0][27])
+            self.ui.slTrail.setChecked(rows[0][28])
+            self.ui.disIndicator.setChecked(rows[0][29])
+            self.ui.disStrategy.setChecked(rows[0][30])
+            self.ui.disTick.setChecked(rows[0][31])
+            self.ui.doubleSpinBox_2.setValue(float(rows[0][32]))
+        cur.execute('select * from strategy')
+        rows = cur.fetchall()
+        for row in rows:
+            if 'peLtp' in row[1]:
+                self.ui.comboBox_2.addItem(row[0])
+            elif 'ceLtp' in row[1]:
+                self.ui.comboBox.addItem(row[0])
+            else:
+                self.ui.comboBox_2.addItem(row[0])
+                self.ui.comboBox.addItem(row[0])
+            self.ui.comboBox_3.addItem(row[0])
+        conn.close()
+
+    
+    def refreshonUpdate(self):
+        self.ui.comboBox_2.clear()
+        self.ui.comboBox_3.clear()
+        self.ui.comboBox.clear()
+        conn = sqlite3.connect('mkcodez.db')
+        cur = conn.cursor()
+        cur.execute('select * from strategy')
+        rows = cur.fetchall()
+        for row in rows:
+            if 'peLtp' in row[1]:
+                self.ui.comboBox_2.addItem(row[0])
+            elif 'ceLtp' in row[1]:
+                self.ui.comboBox.addItem(row[0])
+            else:
+                self.ui.comboBox_2.addItem(row[0])
+                self.ui.comboBox.addItem(row[0])
+            self.ui.comboBox_3.addItem(row[0])
+        conn.close()
+
+    
+    def indexValue(self, checkbox, spinbox, cptype, extype):
+        index = 'NIFTY'
+        if self.ui.tabWidget_4.currentIndex() == 1:
+            index = 'BANKNIFTY'
+        if self.ui.indexFut.isChecked() == True:
+            index = index + ' FUT'
+        
+        try:
+            if checkbox.isChecked():
+                modulas = 40
+                if index.startswith('NIFTY'):
+                    modulas = 20
+                if extype == 'SL':
+                    modulas = -modulas
+                if cptype == 'CE':
+                    spinbox.setValue(float(liveLtp[indexToken[index]]) + modulas)
+                return None
+            None.setValue(float(liveLtp[indexToken[index]]) - modulas)
+        finally:
+            return None
+            if extype == 'SL' and cptype == 'CE':
+                spinbox.setValue(self.cceSl)
+            return None
+            if extype == 'SL' and cptype == 'PE':
+                spinbox.setValue(self.cpeSl)
+            return None
+            if extype == '' and cptype == 'PE':
+                spinbox.setValue(self.cpeTgt)
+            return None
+            if extype == '' or cptype == 'CE':
+                spinbox.setValue(self.cceTgt)
+            return None
+            return None
+            return None
+            error = True
+            return None
+
+
+    
+    def boolValue(self, inputs):
+        if inputs == True:
+            return '1'
+
+    
+    def realValue(self, inputs):
+        if inputs == 1:
+            return True
+
+    
+    def quickOrder(self, text):
+        selectedIndex = 'NIFTY'
+        if self.ui.tabWidget_4.currentIndex() == 1:
+            selectedIndex = 'BANKNIFTY'
+        ltp = int(float(liveLtp[indexToken[selectedIndex]]))
+        modulas = 50
+        if selectedIndex.startswith('BANKNIFTY'):
+            modulas = 100
+        ltp = ltp - ltp % modulas
+        orderType = 'BUY'
+        if self.ui.sellQuick.isChecked():
+            orderType = 'SELL'
+        if text == 'ATMC':
+            self.ui.ceStrike.setText(selectedIndex + self.ui.expiry.currentText() + 'C' + str(ltp))
+            self.placeOrder(self, 'CE', selectedIndex + self.ui.expiry.currentText() + 'C' + str(ltp), orderType, False)
+        if text == 'ITMC':
+            self.ui.ceStrike.setText(selectedIndex + self.ui.expiry.currentText() + 'C' + str(ltp - int(modulas * self.ui.spinBox_6.value())))
+            self.placeOrder(self, 'CE', selectedIndex + self.ui.expiry.currentText() + 'C' + str(ltp - int(modulas * self.ui.spinBox_6.value())), orderType, False)
+        if text == 'OTMC':
+            self.ui.ceStrike.setText(selectedIndex + self.ui.expiry.currentText() + 'C' + str(ltp + int(modulas * self.ui.spinBox_6.value())))
+            self.placeOrder(self, 'CE', selectedIndex + self.ui.expiry.currentText() + 'C' + str(ltp + int(modulas * self.ui.spinBox_6.value())), orderType, False)
+        if text == 'ATMP':
+            self.ui.peStrike.setText(selectedIndex + self.ui.expiry.currentText() + 'P' + str(ltp + modulas))
+            self.placeOrder(self, 'PE', selectedIndex + self.ui.expiry.currentText() + 'P' + str(ltp + modulas), orderType, False)
+        if text == 'ITMP':
+            self.ui.peStrike.setText(selectedIndex + self.ui.expiry.currentText() + 'P' + str(ltp + modulas + modulas * self.ui.spinBox_6.value()))
+            self.placeOrder(self, 'PE', selectedIndex + self.ui.expiry.currentText() + 'P' + str(ltp + modulas + modulas * self.ui.spinBox_6.value()), orderType, False)
+        if text == 'OTMP':
+            self.ui.peStrike.setText(selectedIndex + self.ui.expiry.currentText() + 'P' + str(ltp + modulas - modulas * self.ui.spinBox_6.value()))
+            self.placeOrder(self, 'PE', selectedIndex + self.ui.expiry.currentText() + 'P' + str(ltp + modulas - modulas * self.ui.spinBox_6.value()), orderType, False)
+            return None
+
+    
+    def oiThread(self):
+        global oiRequest
+        oiRequest = True
+
+    
+    def chartData(self):
+        global SErrorMsg, oiTableStart, updateStrategyTableRequest, refreshAllPnl, stratError, restartPnlTable
+        if SErrorMsg == True:
+            SErrorMsg = False
+            error_dialog = QtWidgets.QErrorMessage()
+            error_dialog.showMessage('INVALID STRATEGY!!!')
+            retval = error_dialog.exec_()
+        if oiTableStart == True:
+            oiTableStart = False
+            self.oiUpdateTable()
+            self.futOi()
+        if updateStrategyTableRequest == True:
+            updateStrategyTableRequest = False
+            self.updateStrategyTable()
+        if refreshAllPnl == True:
+            refreshAllPnl = False
+            self.refreshPnlTable()
+        if stratError != None:
+            self.deleteSelectedStrategy(stratError)
+            stratError = None
+        if restartPnlTable == True:
+            restartPnlTable = False
+            self.refreshPnlTable()
+    # WARNING: Decompyle incomplete
+
+    
+    def setColor(self, table, row, column, status):
+        if status == 'LONG BUILDUP':
+            table.item(row, column).setBackground(QColor(0, 153, 0))
+            table.item(row, 0).setBackground(QColor(0, 153, 0))
+        elif status == 'SHORT BUILDUP':
+            table.item(row, column).setBackground(QColor(204, 0, 0))
+            table.item(row, 0).setBackground(QColor(204, 0, 0))
+        elif status == 'SHORT COVER':
+            table.item(row, column).setBackground(QColor(62, 195, 125))
+            table.item(row, 0).setBackground(QColor(62, 195, 125))
+        elif status == 'LONG UNWIND':
+            table.item(row, column).setBackground(QColor(255, 102, 102))
+            table.item(row, 0).setBackground(QColor(255, 102, 102))
+        if 'L+' in status:
+            table.item(row, column).setBackground(QColor(0, 153, 0))
+        elif 'S+' in status:
+            table.item(row, column).setBackground(QColor(204, 0, 0))
+        elif 'S-' in status:
+            table.item(row, column).setBackground(QColor(62, 195, 125))
+        elif 'L-' in status:
+            table.item(row, column).setBackground(QColor(255, 102, 102))
+        if status == 'BULLISH':
+            table.item(row, column).setBackground(QColor(0, 153, 0))
+            table.item(row, 0).setBackground(QColor(0, 153, 0))
+            return None
+        if None == 'BEARISH':
+            table.item(row, column).setBackground(QColor(204, 0, 0))
+            table.item(row, 0).setBackground(QColor(204, 0, 0))
+            return None
+        if None == 'STRONG TREND' or status == 'VOLATILE':
+            table.item(row, column).setBackground(QColor(27, 155, 211))
+            table.item(row, 0).setBackground(QColor(27, 155, 211))
+            return None
+        if None == 'WEAK TREND' or status == 'NOT VOLATILE':
+            table.item(row, column).setBackground(QColor(240, 177, 75))
+            table.item(row, 0).setBackground(QColor(240, 177, 75))
+            return None
+
+    
+    def oiStatus(self, ltp, oi):
+        if ltp > 0 and oi > 0:
+            return 'LONG BUILDUP'
+        if None < 0 and oi > 0:
+            return 'SHORT BUILDUP'
+        if None > 0 and oi < 0:
+            return 'SHORT COVER'
+        if None < 0 and oi < 0:
+            return 'LONG UNWIND'
+
+    
+    def oiStrikeChart(self):
+        global oiGenerated, y1, x1, y2, y4, x1, y3, oiGenerated
+        strike1 = self.ui.oiIndex.currentText() + self.ui.oiExpiry.currentText() + 'C' + str(self.ui.oiStrikes.value())
+        strike2 = self.ui.oiIndex.currentText() + self.ui.oiExpiry.currentText() + 'P' + str(self.ui.oiStrikes.value())
+        token1 = ''
+        token2 = ''
+        oiGenerated = False
+        if strike1 in tokenCache:
+            token1 = tokenCache[strike1]
+        else:
+            ret = api.searchscrip('NFO', strike1, **('exchange', 'searchtext'))
+            if ret != None:
+                symbols = ret['values']
+                for symbol in symbols:
+                    tokenCache[strike1] = symbol['token']
+                    token1 = symbol['token']
+                    if strike2 in tokenCache:
+                        token2 = tokenCache[strike2]
+                    else:
+                        ret = api.searchscrip('NFO', strike2, **('exchange', 'searchtext'))
+                        if ret != None:
+                            symbols = ret['values']
+                            for symbol in symbols:
+                                tokenCache[strike2] = symbol['token']
+                                token2 = symbol['token']
+                                end_time = time.time()
+                                start_time = 604800
+                                tempData = api.get_time_price_series('NFO', token1, start_time, end_time, int(self.ui.oiTime.currentText()), **('exchange', 'token', 'starttime', 'endtime', 'interval'))
+                                y1 = []
+                                x1 = []
+                                y2 = []
+                                i = 0
+                                j = 0
+                                timeData = { }
+                                size = 16
+                                if len(tempData) > 16:
+                                    size = 16
+                                else:
+                                    size = len(tempData)
+        i = len(tempData) - size
+        if i < len(tempData):
+            y1.append(float(tempData[len(tempData) - i - 1]['intc']))
+            y2.append(int(tempData[len(tempData) - i - 1]['intoi']))
+            x1.append(j)
+            timeData[j] = tempData[len(tempData) - i - 1]['time']
+            i += 1
+            j += 1
+            if not i < len(tempData):
+                tempData = api.get_time_price_series('NFO', token2, start_time, end_time, int(self.ui.oiTime.currentText()), **('exchange', 'token', 'starttime', 'endtime', 'interval'))
+                y4 = []
+                x1 = []
+                y3 = []
+                i = 0
+                j = 0
+                timeData = { }
+                size = 16
+                if len(tempData) > 16:
+                    size = 16
+                else:
+                    size = len(tempData)
+        i = len(tempData) - size
+        if i < len(tempData):
+            y4.append(float(tempData[len(tempData) - i - 1]['intc']))
+            y3.append(int(tempData[len(tempData) - i - 1]['intoi']))
+            x1.append(j)
+            timeData[j] = tempData[len(tempData) - i - 1]['time']
+            i += 1
+            j += 1
+            if not i < len(tempData):
+                oiGenerated = True
+                return None
+
+    
+    def refreshPnlTable(self):
+        pass
+    # WARNING: Decompyle incomplete
+
+    
+    def removeData(self):
+        
+        try:
+            plot.removeItem(bargraph)
+            plot2.removeItem(bargraph2)
+            plot3.removeItem(bargraph3)
+            plot4.removeItem(bargraph4)
+            plot5.removeItem(bargraph4)
+            plot6.removeItem(bargraph4)
+        finally:
+            return None
+            error = True
+            return None
+
+
+    
+    def removeBar(self):
+        
+        try:
+            plot5.removeItem(bargraph5)
+            plot6.removeItem(bargraph6)
+        finally:
+            return None
+            error = True
+            return None
+
+
+    
+    def futOi(self):
+        self.removeBar()
+        i = 0
+        y1 = []
+        y2 = []
+        y3 = []
+        y4 = []
+        x = []
+        if i < 16:
+            tempData = oiCache[self.ui.buildupTable.item(i, 3).text() + 'CE']
+            y1.append(int(tempData[0]['intoi']))
+            y3.append(int(tempData[0]['oi']))
+            tempData = oiCache[self.ui.buildupTable.item(i, 3).text() + 'PE']
+            y2.append(int(tempData[0]['intoi']))
+            y4.append(int(tempData[0]['oi']))
+            x.append(int(self.ui.buildupTable.item(i, 3).text()))
+            i += 1
+            if not i < 16:
+                plot5 = pg.plot()
+                bargraph5 = pg.PlotDataItem(x, y1, 'g', 'g', 0.2, 'green', **('pen', 'symbolPen', 'symbolBrush', 'name'))
+                plot5.addItem(bargraph5)
+                bargraph5 = pg.PlotDataItem(x, y2, 'r', 'r', 0.2, 'green', **('pen', 'symbolPen', 'symbolBrush', 'name'))
+                plot5.addItem(bargraph5)
+                layout5.addWidget(plot5, 0, 1, 3, 1)
+                plot6 = pg.plot()
+                bargraph6 = pg.PlotDataItem(x, y3, 'g', 'g', 0.2, 'green', **('pen', 'symbolPen', 'symbolBrush', 'name'))
+                plot6.addItem(bargraph6)
+                bargraph6 = pg.PlotDataItem(x, y4, 'r', 'r', 0.2, 'green', **('pen', 'symbolPen', 'symbolBrush', 'name'))
+                plot6.addItem(bargraph6)
+                layout6.addWidget(plot6, 0, 1, 3, 1)
+                return None
+
+    
+    def oiBuildupData(self):
+        pass
+    # WARNING: Decompyle incomplete
+
+    
+    def oiUpdateTable(self):
+        i = 0
+        if i < 16:
+            tempData = oiCache[self.ui.buildupTable.item(i, 3).text() + 'CE']
+            status = self.checkOiStatus(int(tempData[0]['intoi']), float(tempData[0]['intc']) - float(tempData[1]['intc']))
+            self.ui.buildupTable.setItem(i, 0, QTableWidgetItem(status))
+            self.ui.buildupTable.setItem(i, 2, QTableWidgetItem('{:.2f}'.format(float(tempData[0]['intc']) - float(tempData[1]['intc']))))
+            self.ui.buildupTable.setItem(i, 1, QTableWidgetItem(str(tempData[0]['intoi'])))
+            tempData = oiCache[self.ui.buildupTable.item(i, 3).text() + 'PE']
+            status = self.checkOiStatus(int(tempData[0]['intoi']), float(tempData[0]['intc']) - float(tempData[1]['intc']))
+            self.ui.buildupTable.setItem(i, 6, QTableWidgetItem(status))
+            self.ui.buildupTable.setItem(i, 4, QTableWidgetItem('{:.2f}'.format(float(tempData[0]['intc']) - float(tempData[1]['intc']))))
+            self.ui.buildupTable.setItem(i, 5, QTableWidgetItem(str(tempData[0]['intoi'])))
+            i += 1
+            if not i < 16:
+                self.ui.buildupTable_2.hide()
+                return None
+
+    
+    def findOi(self, token, name):
+        global oiStatus, oiTableStart
+        end_time = time.time()
+        start_time = 5000
+        tempData = api.get_time_price_series('NFO', token, start_time, end_time, int(self.ui.oiTime.currentText()), **('exchange', 'token', 'starttime', 'endtime', 'interval'))
+        oiCache[name] = tempData
+        oiStatus += 1
+        if oiStatus == 32:
+            oiTableStart = True
+            return None
+
+    
+    def checkOiStatus(self, oi, ltp):
+        build = 'NONE'
+        if oi > 0 and ltp > 0:
+            build = 'LONG BUILD'
+            return build
+        if None > 0 and ltp < 0:
+            build = 'SHORT BUILD'
+            return build
+        if None < 0 and ltp > 0:
+            build = 'SHORT COVER'
+            return build
+        if None < 0 and ltp < 0:
+            build = 'LONG UNWIND'
+        return build
+
+    
+    def stopIndicators(self):
+        liveIndicators.exitFlag = True
+        self.ui.checkIndicator.setEnabled(True)
+        self.ui.stopIndicator.setEnabled(False)
+
+    
+    def refreshIndicators(self):
+        pass
+    # WARNING: Decompyle incomplete
+
+    
+    def indicatorDetails(self, name):
+        pass
+    # WARNING: Decompyle incomplete
+
+    
+    def updateIndicatorTable(self):
+        temp = {
+            'NIFTY': 'N',
+            'BANKNIFTY': 'BN',
+            'NIFTY FUT': 'NF',
+            'BANKNIFTY FUT': 'BNF' }
+        conn = sqlite3.connect('mkcodez.db')
+        bull = self.ui.lineEdit_4.text()
+        bear = self.ui.lineEdit_5.text()
+        if bull == '':
+            bull = '0'
+        if bear == '':
+            bear = '0'
+    # WARNING: Decompyle incomplete
+
+    
+    def deleteIndicator(self):
+        pass
+    # WARNING: Decompyle incomplete
+
+    
+    def stopFunc(self):
+        strategyControl.exitFlag = True
+        positionControl.exitFlag = True
+        
+        try:
+            liveIndicators.exitFlag = True
+        finally:
+            pass
+        error = True
+        self.close_websocket()
+        sys.exit()
+        return None
+
+
+    
+    def createTable(self):
+        strike = 16500
+        i = 0
+        self.clearTable()
+        if i < 16:
+            self.ui.optionTable.insertRow(self.ui.optionTable.rowCount())
+            self.ui.optionTable.setItem(self.ui.optionTable.rowCount() - 1, 3, QTableWidgetItem(str(strike)))
+            self.ui.optionTable.setItem(self.ui.optionTable.rowCount() - 1, 2, QTableWidgetItem(0))
+            self.ui.optionTable.setItem(self.ui.optionTable.rowCount() - 1, 4, QTableWidgetItem(0))
+            strike += 50
+            i += 1
+            if not i < 16:
+                return None
+            return None
+
+    
+    def clearTable(self, text):
+        pass
+    # WARNING: Decompyle incomplete
+
+    
+    def updateTable(self):
+        strike = 165
+        i = 0
+        if i < 16:
+            self.ui.optionTable.setItem(i, 1, QTableWidgetItem(str(strike)))
+            self.ui.optionTable.setItem(i, 3, QTableWidgetItem(str(strike)))
+            strike += 5
+            i += 1
+            if not i < 16:
+                return None
+            return None
+
+    
+    def oiIndexChanged(self, text):
+        token = '26000'
+        modulas = 50
+        if text == 'BANKNIFTY':
+            token = '26009'
+            modulas = 100
+        ret = api.get_quotes('NSE', token, **('exchange', 'token'))
+        ltp = int(float(ret['lp']))
+        ltp = ltp - ltp % modulas
+        self.ui.oiStrikes.setValue(ltp)
+        self.ui.oiStrikes.setSingleStep(modulas)
+
+    
+    def text_changed(self, text):
+        self.clearTable(text)
+        index = 'NIFTY'
+        modulas = 50
+        inc = 13
+        niftyToken = '26000'
+        currTable = self.ui.optionTable
+        selectedExpiry = self.ui.expiry.currentText()
+        currIndex = text
+        if self.ui.indexFut.isChecked() == True:
+            currIndex = currIndex + ' FUT'
+        self.ui.exitIndex.setCurrentText(currIndex)
+        if text == 'BANKNIFTY':
+            niftyToken = '26009'
+            modulas = 100
+            index = 'BANKNIFTY'
+            inc = 17
+            currTable = self.ui.optionTable_3
+        ret = api.get_quotes('NSE', niftyToken, **('exchange', 'token'))
+        ltp = int(float(ret['lp']))
+        ltp = ltp - ltp % modulas
+        i = 0
+        numStrikes = self.ui.spinBox.value()
+        strike = ltp - numStrikes * modulas
+        numStrikes = numStrikes * 2
+        if i < numStrikes:
+            currTable.insertRow(currTable.rowCount())
+            currTable.setRowHeight(currTable.rowCount() - 1, 5)
+            currTable.setItem(i, 5, QTableWidgetItem(str(strike)))
+            currTable.setItem(i, 4, QTableWidgetItem('0'))
+            currTable.setItem(i, 6, QTableWidgetItem('0'))
+            strike += modulas
+            i += 1
+            if not i < numStrikes:
+                currTable.setColumnWidth(0, 100)
+                currTable.setColumnWidth(1, 100)
+                currTable.setColumnWidth(2, 70)
+                currTable.setColumnWidth(3, 70)
+                currTable.setColumnWidth(4, 70)
+                currTable.setColumnWidth(5, 70)
+                currTable.setColumnWidth(6, 70)
+                currTable.setColumnWidth(7, 70)
+                currTable.setColumnWidth(8, 70)
+                currTable.setColumnWidth(9, 100)
+                currTable.setColumnWidth(10, 100)
+                t1 = threading.Thread(self.optionChainThread, (ltp, text, index, selectedExpiry, modulas), **('target', 'args'))
+                t1.start()
+                return None
+
+    
+    def optionChainThread(self, ltp, text, index, selectedExpiry, modulas):
+        global tableTokens, tableTokens2
+        error = False
+        numStrikes = self.ui.spinBox.value()
+        chain = api.get_option_chain('NFO', index + selectedExpiry + 'C' + str(ltp), ltp, numStrikes, **('exchange', 'tradingsymbol', 'strikeprice', 'count'))
+        chainscrips = []
+        tokens = []
+        for scrip in chain['values']:
+            scripdata = api.get_quotes('NFO', scrip['token'], **('exchange', 'token'))
+            chainscrips.append(scripdata)
+        for scripts in chainscrips:
+            if scripts['tsym'] not in allTokens:
+                allTokens[scripts['tsym']] = scripts['token']
+                optionTokens[scripts['cname'].split(' ')[2] + scripts['cname'].split(' ')[3]] = scripts['token']
+                tokens.append(scripts['token'])
+        i = 0
+        ltp = ltp - numStrikes * modulas
+        numStrikes = numStrikes * 2
+        i = 0
+        j = numStrikes - 1
+        i = 0
+        k = numStrikes - 1
+        if text == 'NIFTY':
+            tableTokens = { }
+        else:
+            tableTokens2 = { }
+    # WARNING: Decompyle incomplete
+
+    
+    def event_handler_order_update(self, message):
+        pass
+    # WARNING: Decompyle incomplete
+
+    
+    def updateOrderFields(self, temp, name):
+        pass
+    # WARNING: Decompyle incomplete
+
+    
+    def event_handler_quote_update(self, message):
+        liveLtp[message['tk']] = str(message['lp'])
+        webData[message['tk']] = message
+    # WARNING: Decompyle incomplete
+
+    
+    def open_callback(self):
+        tempTokens = []
+        for tok in indexToken:
+            if tok.endswith('FUT'):
+                tempTokens.append('NFO|' + indexToken[tok])
+                continue
+            tempTokens.append('NSE|' + indexToken[tok])
+        api.subscribe(tempTokens, 'd', **('feed_type',))
+
+    
+    def subscribe(self, tokens):
+        tempTokens = []
+        for tok in tokens:
+            tempTokens.append('NFO|' + tok)
+        api.subscribe(tempTokens, 'd', **('feed_type',))
+
+    
+    def close_websocket(self):
+        global socket_opened
+        api.close_websocket()
+        socket_opened = False
+
+    
+    def selectedStrike(self, text):
+        if text == 'NIFTY':
+            if self.ui.optionTable.currentColumn() <= 5:
+                self.ui.ceStrike.setText('NIFTY' + self.ui.expiry.currentText() + 'C' + self.ui.optionTable.item(self.ui.optionTable.currentRow(), 5).text())
+                self.ui.ceLimitPrice.setValue(float(self.ui.optionTable.item(self.ui.optionTable.currentRow(), 4).text()))
+                return None
+            None.ui.peStrike.setText('NIFTY' + self.ui.expiry.currentText() + 'P' + self.ui.optionTable.item(self.ui.optionTable.currentRow(), 5).text())
+            self.ui.peLimitPrice.setValue(float(self.ui.optionTable.item(self.ui.optionTable.currentRow(), 6).text()))
+            return None
+        if None == 'BANKNIFTY':
+            if self.ui.optionTable_3.currentColumn() <= 5:
+                self.ui.ceStrike.setText('BANKNIFTY' + self.ui.expiry.currentText() + 'C' + self.ui.optionTable_3.item(self.ui.optionTable_3.currentRow(), 5).text())
+                self.ui.ceLimitPrice.setValue(float(self.ui.optionTable_3.item(self.ui.optionTable_3.currentRow(), 4).text()))
+                return None
+            None.ui.peStrike.setText('BANKNIFTY' + self.ui.expiry.currentText() + 'P' + self.ui.optionTable_3.item(self.ui.optionTable_3.currentRow(), 5).text())
+            self.ui.peLimitPrice.setValue(float(self.ui.optionTable_3.item(self.ui.optionTable_3.currentRow(), 6).text()))
+            return None
+
+    
+    def selectedOI(self):
+        pass
+    # WARNING: Decompyle incomplete
+
+    
+    def selectPosition(self):
+        if self.ui.positionTable.currentColumn() == 8:
+            self.exitTrigger()
+            return None
+        strike = None.ui.positionTable.item(self.ui.positionTable.currentRow(), 0).text()
+        self.ui.sl.setChecked(controls['pnl'][strike]['chkSl'])
+        self.ui.indexSl.setChecked(controls['pnl'][strike]['chkindSl'])
+        self.ui.target.setChecked(controls['pnl'][strike]['chkTarget'])
+        self.ui.indexTarget.setChecked(controls['pnl'][strike]['chkindTarget'])
+        self.ui.uTrail.setChecked(controls['pnl'][strike]['trailEnabled'])
+        self.ui.target2.setChecked(controls['pnl'][strike]['partEnabled'])
+        self.ui.indexTarget2.setChecked(controls['pnl'][strike]['partIndex'])
+        self.ui.slValue.setValue(controls['pnl'][strike]['sl'])
+        self.ui.targetValue.setValue(controls['pnl'][strike]['target'])
+        self.ui.uTrailValue.setValue(controls['pnl'][strike]['trail'])
+        self.ui.target2Value.setValue(controls['pnl'][strike]['partTarget'])
+        self.ui.halfQty2.setValue(controls['pnl'][strike]['partQty'])
+        self.ui.checkBox_13.setChecked(controls['pnl'][strike]['limitsl'])
+        self.ui.checkBox_14.setChecked(controls['pnl'][strike]['limittarget'])
+        self.ui.checkBox_19.setChecked(controls['pnl'][strike]['slTrail'])
+        self.ui.doubleSpinBox.setValue(controls['pnl'][strike]['buffer'])
+        self.ui.frame.show()
+
+    
+    def updateRiskReward(self):
+        strike = ''
+    # WARNING: Decompyle incomplete
+
+    
+    def placeOrder(self, button, cptype, strike, side, strat):
+        limitBuffer = 0
+        self.ui.frame.hide()
+        if cptype == 'CE':
+            if strat == False:
+                self.updateInputs(cptype, strike, side)
+            if strike == '':
+                strike = self.ui.ceStrike.text()
+            orderType = 'MKT'
+            price = 0
+            if controls['ceConfig']['chkLimit'] == True:
+                orderType = 'LMT'
+                price = float(controls['ceConfig']['limit'])
+            tranType = 'B'
+            if controls['ceConfig']['sell'] == True:
+                tranType = 'S'
+            if controls['ceConfig']['limitEntry'] == True and controls['ceConfig']['chkLimit'] == True:
+                
+                try:
+                    limitBuffer = float(controls['ceConfig']['buffer'])
+                    price = getLtp(controls['ceConfig']['strike'])
+                    if tranType == 'B':
+                        price = price + limitBuffer
+                    elif tranType == 'S':
+                        price = price - limitBuffer
+                finally:
+                    pass
+                limitBuffer = float(controls['ceConfig']['buffer'])
+                if tranType == 'B':
+                    price = price + limitBuffer
+                elif tranType == 'S':
+                    price = price - limitBuffer
+
+            if price > 0:
+                price = float('{:.2f}'.format(price))
+                price = (int(price * 100) - int(price * 100) % 5) / 100
+            freeze = 1800
+            if strike.startswith('BANKNIFTY'):
+                freeze = 900
+            qty = int(controls['ceConfig']['quantity'])
+            i = 0
+            product_type = 'I'
+            if self.ui.normalOrder.isChecked() == True:
+                product_type = 'M'
+            n = int(qty / freeze)
+            bal = qty % freeze
+            if i < n:
+                ret = api.place_order(tranType, product_type, 'NFO', strike, freeze, 0, orderType, price, None, 'DAY', 'manual', **('buy_or_sell', 'product_type', 'exchange', 'tradingsymbol', 'quantity', 'discloseqty', 'price_type', 'price', 'trigger_price', 'retention', 'remarks'))
+                i += 1
+                if i < n or bal > 0:
+                    ret = api.place_order(tranType, product_type, 'NFO', strike, bal, 0, orderType, price, None, 'DAY', 'manual', **('buy_or_sell', 'product_type', 'exchange', 'tradingsymbol', 'quantity', 'discloseqty', 'price_type', 'price', 'trigger_price', 'retention', 'remarks'))
+                    return None
+                return None
+            if None == 'PE':
+                if strat == False:
+                    self.updateInputs(cptype, strike, side)
+                if strike == '':
+                    strike = self.ui.peStrike.text()
+                orderType = 'MKT'
+                price = 0
+                if controls['peConfig']['chkLimit'] == True:
+                    orderType = 'LMT'
+                    price = float(controls['peConfig']['limit'])
+                tranType = 'B'
+                product_type = 'I'
+                if self.ui.normalOrder.isChecked() == True:
+                    product_type = 'M'
+                if controls['peConfig']['sell'] == True:
+                    tranType = 'S'
+                if controls['peConfig']['limitEntry'] == True and controls['peConfig']['chkLimit'] == True:
+                    
+                    try:
+                        limitBuffer = float(controls['peConfig']['buffer'])
+                        price = getLtp(controls['peConfig']['strike'])
+                        if tranType == 'B':
+                            price = price + limitBuffer
+                        elif tranType == 'S':
+                            price = price - limitBuffer
+                    finally:
+                        pass
+                    limitBuffer = float(controls['peConfig']['buffer'])
+                    if tranType == 'B':
+                        price = price + limitBuffer
+                    elif tranType == 'S':
+                        price = price - limitBuffer
+
+                if price > 0:
+                    price = float('{:.2f}'.format(price))
+                    price = (int(price * 100) - int(price * 100) % 5) / 100
+                freeze = 1800
+                if strike.startswith('BANKNIFTY'):
+                    freeze = 900
+                qty = int(controls['peConfig']['quantity'])
+                i = 0
+                n = int(qty / freeze)
+                bal = qty % freeze
+                if i < n:
+                    ret = api.place_order(tranType, product_type, 'NFO', strike, freeze, 0, orderType, price, None, 'DAY', 'manual', **('buy_or_sell', 'product_type', 'exchange', 'tradingsymbol', 'quantity', 'discloseqty', 'price_type', 'price', 'trigger_price', 'retention', 'remarks'))
+                    i += 1
+                    if i < n or bal > 0:
+                        ret = api.place_order(tranType, product_type, 'NFO', strike, bal, 0, orderType, price, None, 'DAY', 'manual', **('buy_or_sell', 'product_type', 'exchange', 'tradingsymbol', 'quantity', 'discloseqty', 'price_type', 'price', 'trigger_price', 'retention', 'remarks'))
+                        return None
+                    return None
+                return None
+
+    
+    def updateInputs(self, cptype, strike, side):
+        index = 'NIFTY'
+        if self.ui.tabWidget_4.currentIndex() == 1:
+            index = 'BANKNIFTY'
+        if self.ui.indexFut.isChecked() == True:
+            index = index + ' FUT'
+    # WARNING: Decompyle incomplete
+
+    
+    def addToScan(self, cptype):
+        index = 'NIFTY'
+        if self.ui.tabWidget_4.currentIndex() == 1:
+            index = 'BANKNIFTY'
+        if self.ui.indexFut.isChecked() == True:
+            index = index + ' FUT'
+    # WARNING: Decompyle incomplete
+
+    
+    def addToScan2(self, cptype):
+        global SErrorMsg
+        index = 'NIFTY'
+        if self.ui.tabWidget_4.currentIndex() == 1:
+            index = 'BANKNIFTY'
+        if self.ui.indexFut.isChecked() == True:
+            index = index + ' FUT'
+    # WARNING: Decompyle incomplete
+
+    
+    def updateStrategyTable(self):
+        pass
+    # WARNING: Decompyle incomplete
+
+    
+    def selectedOrders(self):
+        self.ui.modLimit.setValue(float(self.ui.openTable.item(self.ui.openTable.currentRow(), 4).text()))
+        self.ui.modQty.setValue(int(self.ui.openTable.item(self.ui.openTable.currentRow(), 3).text()))
+        self.ui.modMarket.setChecked(False)
+
+    
+    def openOrders(self):
+        pass
+    # WARNING: Decompyle incomplete
+
+    
+    def cancelOrders(self):
+        orderID = self.ui.openTable.item(self.ui.openTable.currentRow(), 0).text()
+        ret = api.cancel_order(orderID, **('orderno',))
+        self.openOrders()
+
+    
+    def cancelAllOrders(self):
+        order = api.get_order_book()
+    # WARNING: Decompyle incomplete
+
+    
+    def modifyOrders(self):
+        orderID = self.ui.openTable.item(self.ui.openTable.currentRow(), 0).text()
+        name = self.ui.openTable.item(self.ui.openTable.currentRow(), 1).text()
+        newprice_type = 'LMT'
+        newPrice = float(self.ui.modLimit.value())
+        if self.ui.modMarket.isChecked():
+            newprice_type = 'MKT'
+            newPrice = 0
+        ret = api.modify_order('NFO', name, orderID, newprice_type, int(self.ui.modQty.value()), newPrice, **('exchange', 'tradingsymbol', 'orderno', 'newprice_type', 'newquantity', 'newprice'))
+        self.openOrders()
+
+    
+    def addSpreads(self):
+        cpType = 'C'
+        if self.ui.radioButton_3.isChecked() == True:
+            cpType = 'P'
+        strike = self.ui.comboBox_6.currentText() + self.ui.comboBox_7.currentText() + cpType + str(self.ui.spinBox_2.value())
+        ordType = 'B'
+        if self.ui.radioButton_6.isChecked() == True:
+            ordType = 'S'
+        exch = 'NFO'
+        query = strike
+        i = 0
+        strikeFound = False
+        if i < self.ui.optionStrategyTable.rowCount():
+            if self.ui.optionStrategyTable.item(i, 0).text() == strike and self.ui.optionStrategyTable.item(i, 2).text() != ordType:
+                strikeFound = True
+            else:
+                i += 1
+                if i < self.ui.optionStrategyTable.rowCount() or strikeFound == False:
+                    ret = api.searchscrip(exch, query, **('exchange', 'searchtext'))
+                    token = ''
+                    if ret != None:
+                        symbols = ret['values']
+                        for symbol in symbols:
+                            token = symbol['token']
+                            allTokens[query] = token
+                            ret = api.get_quotes('NFO', token, **('exchange', 'token'))
+                            lastPrice = ret['lp']
+                            self.ui.optionStrategyTable.insertRow(self.ui.optionStrategyTable.rowCount())
+                            self.ui.optionStrategyTable.setItem(self.ui.optionStrategyTable.rowCount() - 1, 0, QTableWidgetItem(strike))
+                            self.ui.optionStrategyTable.setItem(self.ui.optionStrategyTable.rowCount() - 1, 1, QTableWidgetItem(str(self.ui.spinBox_2.value())))
+                            self.ui.optionStrategyTable.setItem(self.ui.optionStrategyTable.rowCount() - 1, 2, QTableWidgetItem(ordType))
+                            self.ui.optionStrategyTable.setItem(self.ui.optionStrategyTable.rowCount() - 1, 3, QTableWidgetItem(cpType + 'E'))
+                            self.ui.optionStrategyTable.setItem(self.ui.optionStrategyTable.rowCount() - 1, 4, QTableWidgetItem(str(self.ui.spinBox_4.value())))
+                            self.ui.optionStrategyTable.setItem(self.ui.optionStrategyTable.rowCount() - 1, 5, QTableWidgetItem(lastPrice))
+                            self.calcProfit()
+                            return None
+
+    
+    def calcProfit(self):
+        j = self.ui.horizontalSlider.minimum()
+        k = self.ui.horizontalSlider.maximum()
+        maxProfit = 0
+        maxLoss = 0
+        if j <= k:
+            count = self.ui.optionStrategyTable.rowCount()
+            overAllProfit = 0
+            i = 0
+            if i < count:
+                if self.ui.optionStrategyTable.item(i, 2).text() == 'B':
+                    if self.ui.optionStrategyTable.item(i, 3).text() == 'CE':
+                        profit = (j - float(self.ui.optionStrategyTable.item(i, 1).text()) - float(self.ui.optionStrategyTable.item(i, 5).text())) * int(self.ui.optionStrategyTable.item(i, 4).text())
+                        if j - float(self.ui.optionStrategyTable.item(i, 1).text()) < -float(self.ui.optionStrategyTable.item(i, 5).text()):
+                            profit = -float(self.ui.optionStrategyTable.item(i, 5).text()) * int(self.ui.optionStrategyTable.item(i, 4).text())
+                        overAllProfit += profit
+                    elif self.ui.optionStrategyTable.item(i, 3).text() == 'PE':
+                        profit = (float(self.ui.optionStrategyTable.item(i, 1).text()) - j - float(self.ui.optionStrategyTable.item(i, 5).text())) * int(self.ui.optionStrategyTable.item(i, 4).text())
+                        if float(self.ui.optionStrategyTable.item(i, 1).text()) - j < -float(self.ui.optionStrategyTable.item(i, 5).text()):
+                            profit = -float(self.ui.optionStrategyTable.item(i, 5).text()) * int(self.ui.optionStrategyTable.item(i, 4).text())
+                        overAllProfit += profit
+                    elif self.ui.optionStrategyTable.item(i, 2).text() == 'S':
+                        if self.ui.optionStrategyTable.item(i, 3).text() == 'CE':
+                            profit = ((float(self.ui.optionStrategyTable.item(i, 1).text()) - j) + float(self.ui.optionStrategyTable.item(i, 5).text())) * int(self.ui.optionStrategyTable.item(i, 4).text())
+                            if float(self.ui.optionStrategyTable.item(i, 1).text()) - j >= 0:
+                                profit = float(self.ui.optionStrategyTable.item(i, 5).text()) * int(self.ui.optionStrategyTable.item(i, 4).text())
+                            overAllProfit += profit
+                        elif self.ui.optionStrategyTable.item(i, 3).text() == 'PE':
+                            profit = ((j - float(self.ui.optionStrategyTable.item(i, 1).text())) + float(self.ui.optionStrategyTable.item(i, 5).text())) * int(self.ui.optionStrategyTable.item(i, 4).text())
+                            if j - float(self.ui.optionStrategyTable.item(i, 1).text()) >= 0:
+                                profit = float(self.ui.optionStrategyTable.item(i, 5).text()) * int(self.ui.optionStrategyTable.item(i, 4).text())
+                            overAllProfit += profit
+                i += 1
+                if i < count or overAllProfit > maxProfit:
+                    maxProfit = overAllProfit
+                elif overAllProfit < maxLoss:
+                    maxLoss = overAllProfit
+            j += 1
+            if not j <= k:
+                self.ui.maxProfit.setText('Max.Profit: ' + '{:.2f}'.format(maxProfit))
+                self.ui.maxLoss.setText('Max.Loss: ' + '{:.2f}'.format(maxLoss))
+                return None
+
+    
+    def selectSpread(self):
+        self.clearStrategies()
+        curText = self.ui.listWidget.currentItem().text()
+        niftyToken = '26000'
+        modulas = 50
+        qty = int(self.ui.spinBox_4.value())
+        selectedExpiry = self.ui.comboBox_7.currentText()
+        text = self.ui.comboBox_6.currentText()
+        if text.startswith('BANKNIFTY'):
+            niftyToken = '26009'
+            modulas = 100
+        ret = api.get_quotes('NSE', niftyToken, **('exchange', 'token'))
+        ltp = int(float(ret['lp']))
+        ltp = ltp - ltp % modulas
+        gaps = int(self.ui.gaps.value())
+        if curText == 'Bull Call Spread':
+            curText
+            strike = self.ui.comboBox_6.currentText() + self.ui.comboBox_7.currentText() + 'C' + str(ltp)
+            self.addLegs(strike, ltp, 'B', 'C', qty)
+            strike = self.ui.comboBox_6.currentText() + self.ui.comboBox_7.currentText() + 'C' + str(ltp + gaps * modulas)
+            self.addLegs(strike, ltp + gaps * modulas, 'S', 'C', qty)
+        elif curText == 'Bull Put Spread':
+            curText
+            strike = self.ui.comboBox_6.currentText() + self.ui.comboBox_7.currentText() + 'P' + str(ltp - gaps * modulas)
+            self.addLegs(strike, ltp - gaps * modulas, 'B', 'P', qty)
+            strike = self.ui.comboBox_6.currentText() + self.ui.comboBox_7.currentText() + 'P' + str(ltp + gaps * modulas)
+            self.addLegs(strike, ltp + gaps * modulas, 'S', 'P', qty)
+        elif curText == 'Call Ratio Back Spread':
+            curText
+            strike = self.ui.comboBox_6.currentText() + self.ui.comboBox_7.currentText() + 'C' + str(ltp - gaps * modulas)
+            self.addLegs(strike, ltp - gaps * modulas, 'S', 'C', qty)
+            strike = self.ui.comboBox_6.currentText() + self.ui.comboBox_7.currentText() + 'C' + str(ltp + gaps * modulas)
+            self.addLegs(strike, ltp + gaps * modulas, 'B', 'C', qty * 2)
+        elif curText == 'Bear Call Ladder':
+            curText
+            strike = self.ui.comboBox_6.currentText() + self.ui.comboBox_7.currentText() + 'C' + str(ltp - (gaps + 2) * modulas)
+            self.addLegs(strike, ltp - (gaps + 2) * modulas, 'S', 'C', qty)
+            strike = self.ui.comboBox_6.currentText() + self.ui.comboBox_7.currentText() + 'C' + str(ltp)
+            self.addLegs(strike, ltp, 'B', 'C', qty)
+            strike = self.ui.comboBox_6.currentText() + self.ui.comboBox_7.currentText() + 'C' + str(ltp + 2 * modulas)
+            self.addLegs(strike, ltp + gaps * modulas, 'B', 'C', qty)
+        elif curText == 'Synthetic Long & Arbitrage':
+            curText
+            strike = self.ui.comboBox_6.currentText() + self.ui.comboBox_7.currentText() + 'C' + str(ltp)
+            self.addLegs(strike, ltp, 'B', 'C', qty)
+            strike = self.ui.comboBox_6.currentText() + self.ui.comboBox_7.currentText() + 'P' + str(ltp)
+            self.addLegs(strike, ltp, 'S', 'P', qty)
+        elif curText == 'Bear Put Spread':
+            curText
+            strike = self.ui.comboBox_6.currentText() + self.ui.comboBox_7.currentText() + 'P' + str(ltp + gaps * modulas)
+            self.addLegs(strike, ltp + gaps * modulas, 'B', 'P', qty)
+            strike = self.ui.comboBox_6.currentText() + self.ui.comboBox_7.currentText() + 'P' + str(ltp - gaps * modulas)
+            self.addLegs(strike, ltp - gaps * modulas, 'S', 'P', qty)
+        elif curText == 'Bear Call Spread':
+            curText
+            strike = self.ui.comboBox_6.currentText() + self.ui.comboBox_7.currentText() + 'C' + str(ltp + gaps * modulas)
+            self.addLegs(strike, ltp + gaps * modulas, 'B', 'C', qty)
+            strike = self.ui.comboBox_6.currentText() + self.ui.comboBox_7.currentText() + 'C' + str(ltp - gaps * modulas)
+            self.addLegs(strike, ltp - gaps * modulas, 'S', 'C', qty)
+        elif curText == 'Put Ratio Back spread':
+            curText
+            strike = self.ui.comboBox_6.currentText() + self.ui.comboBox_7.currentText() + 'P' + str(ltp + gaps * modulas)
+            self.addLegs(strike, ltp + gaps * modulas, 'S', 'P', qty)
+            strike = self.ui.comboBox_6.currentText() + self.ui.comboBox_7.currentText() + 'P' + str(ltp - gaps * modulas)
+            self.addLegs(strike, ltp - gaps * modulas, 'B', 'P', 2 * qty)
+        elif curText == 'Long Straddle':
+            curText
+            strike = self.ui.comboBox_6.currentText() + self.ui.comboBox_7.currentText() + 'C' + str(ltp)
+            self.addLegs(strike, ltp, 'B', 'C', qty)
+            strike = self.ui.comboBox_6.currentText() + self.ui.comboBox_7.currentText() + 'P' + str(ltp)
+            self.addLegs(strike, ltp, 'B', 'P', qty)
+        elif curText == 'Short Straddle':
+            curText
+            strike = self.ui.comboBox_6.currentText() + self.ui.comboBox_7.currentText() + 'C' + str(ltp)
+            self.addLegs(strike, ltp, 'S', 'C', qty)
+            strike = self.ui.comboBox_6.currentText() + self.ui.comboBox_7.currentText() + 'P' + str(ltp)
+            self.addLegs(strike, ltp, 'S', 'P', qty)
+        elif curText == 'Long Strangle':
+            curText
+            strike = self.ui.comboBox_6.currentText() + self.ui.comboBox_7.currentText() + 'C' + str(ltp + gaps * modulas)
+            self.addLegs(strike, ltp + gaps * modulas, 'B', 'C', qty)
+            strike = self.ui.comboBox_6.currentText() + self.ui.comboBox_7.currentText() + 'P' + str(ltp - gaps * modulas)
+            self.addLegs(strike, ltp - gaps * modulas, 'B', 'P', qty)
+        elif curText == 'Short Strangle':
+            curText
+            strike = self.ui.comboBox_6.currentText() + self.ui.comboBox_7.currentText() + 'C' + str(ltp + gaps * modulas)
+            self.addLegs(strike, ltp + gaps * modulas, 'S', 'C', qty)
+            strike = self.ui.comboBox_6.currentText() + self.ui.comboBox_7.currentText() + 'P' + str(ltp - gaps * modulas)
+            self.addLegs(strike, ltp - gaps * modulas, 'S', 'P', qty)
+        elif curText == 'Short Iron Butterfly':
+            curText
+            strike = self.ui.comboBox_6.currentText() + self.ui.comboBox_7.currentText() + 'C' + str(ltp)
+            self.addLegs(strike, ltp, 'S', 'C', qty)
+            strike = self.ui.comboBox_6.currentText() + self.ui.comboBox_7.currentText() + 'C' + str(ltp + gaps * modulas)
+            self.addLegs(strike, ltp + gaps * modulas, 'B', 'C', qty)
+            strike = self.ui.comboBox_6.currentText() + self.ui.comboBox_7.currentText() + 'P' + str(ltp)
+            self.addLegs(strike, ltp, 'S', 'P', qty)
+            strike = self.ui.comboBox_6.currentText() + self.ui.comboBox_7.currentText() + 'P' + str(ltp - gaps * modulas)
+            self.addLegs(strike, ltp - gaps * modulas, 'B', 'P', qty)
+        elif curText == 'Long Iron Butterfly':
+            curText
+            strike = self.ui.comboBox_6.currentText() + self.ui.comboBox_7.currentText() + 'C' + str(ltp)
+            self.addLegs(strike, ltp, 'B', 'C', qty)
+            strike = self.ui.comboBox_6.currentText() + self.ui.comboBox_7.currentText() + 'C' + str(ltp + gaps * modulas)
+            self.addLegs(strike, ltp + gaps * modulas, 'S', 'C', qty)
+            strike = self.ui.comboBox_6.currentText() + self.ui.comboBox_7.currentText() + 'P' + str(ltp)
+            self.addLegs(strike, ltp, 'B', 'P', qty)
+            strike = self.ui.comboBox_6.currentText() + self.ui.comboBox_7.currentText() + 'P' + str(ltp - gaps * modulas)
+            self.addLegs(strike, ltp - gaps * modulas, 'S', 'P', qty)
+        elif curText == 'Iron Condor':
+            strike = self.ui.comboBox_6.currentText() + self.ui.comboBox_7.currentText() + 'C' + str(ltp + gaps * modulas)
+            self.addLegs(strike, str(ltp + gaps * modulas), 'S', 'C', qty)
+            strike = self.ui.comboBox_6.currentText() + self.ui.comboBox_7.currentText() + 'C' + str(ltp + (gaps + 3) * modulas)
+            self.addLegs(strike, ltp + (gaps + 3) * modulas, 'B', 'C', qty)
+            strike = self.ui.comboBox_6.currentText() + self.ui.comboBox_7.currentText() + 'P' + str(ltp - gaps * modulas)
+            self.addLegs(strike, ltp - gaps * modulas, 'S', 'P', qty)
+            strike = self.ui.comboBox_6.currentText() + self.ui.comboBox_7.currentText() + 'P' + str(ltp - (gaps + 3) * modulas)
+            self.addLegs(strike, ltp - (gaps + 3) * modulas, 'B', 'P', qty)
+        self.calcProfit()
+
+    
+    def addLegs(self, name, strike, side, cpType, qty):
+        self.ui.optionStrategyTable.insertRow(self.ui.optionStrategyTable.rowCount())
+        self.ui.optionStrategyTable.setItem(self.ui.optionStrategyTable.rowCount() - 1, 0, QTableWidgetItem(name))
+        self.ui.optionStrategyTable.setItem(self.ui.optionStrategyTable.rowCount() - 1, 1, QTableWidgetItem(str(strike)))
+        self.ui.optionStrategyTable.setItem(self.ui.optionStrategyTable.rowCount() - 1, 2, QTableWidgetItem(side))
+        self.ui.optionStrategyTable.setItem(self.ui.optionStrategyTable.rowCount() - 1, 3, QTableWidgetItem(cpType + 'E'))
+        self.ui.optionStrategyTable.setItem(self.ui.optionStrategyTable.rowCount() - 1, 4, QTableWidgetItem(str(qty)))
+        token = ''
+        if name not in allTokens:
+            ret = api.searchscrip('NFO', name, **('exchange', 'searchtext'))
+            if ret != None:
+                symbols = ret['values']
+                for symbol in symbols:
+                    token = symbol['token']
+                    allTokens[name] = token
+                    ret = api.get_quotes('NFO', allTokens[name], **('exchange', 'token'))
+                    lastPrice = ret['lp']
+                    self.ui.optionStrategyTable.setItem(self.ui.optionStrategyTable.rowCount() - 1, 5, QTableWidgetItem(lastPrice))
+                    return None
+
+    
+    def spreadIndex(self):
+        niftyToken = '26000'
+        modulas = 50
+        qty = 50
+        adder = 1500
+        selectedExpiry = self.ui.comboBox_7.currentText()
+        text = self.ui.comboBox_6.currentText()
+        if text.startswith('BANKNIFTY'):
+            niftyToken = '26009'
+            modulas = 100
+            adder = 3000
+            qty = 25
+        ret = api.get_quotes('NSE', niftyToken, **('exchange', 'token'))
+        ltp = int(float(ret['lp']))
+        ltp = ltp - ltp % modulas
+        self.ui.horizontalSlider.setMinimum(ltp - adder)
+        self.ui.horizontalSlider.setMaximum(ltp + adder)
+        self.ui.horizontalSlider.setValue(ltp)
+        self.ui.label_25.setText(str(ltp))
+        self.ui.spinBox_2.setValue(ltp)
+        self.ui.spinBox_2.setSingleStep(modulas)
+        self.ui.spinBox_4.setSingleStep(qty)
+        self.ui.spinBox_4.setMinimum(qty)
+
+    
+    def optionProfit(self):
+        self.ui.label_25.setText(str(self.ui.horizontalSlider.value()))
+        count = self.ui.optionStrategyTable.rowCount()
+        overAllProfit = 0
+        i = 0
+    # WARNING: Decompyle incomplete
+
+    
+    def poolOrder(self):
+        pass
+    # WARNING: Decompyle incomplete
+
+    
+    def clearStrategies(self):
+        pass
+    # WARNING: Decompyle incomplete
+
+    
+    def deleteOpstra(self):
+        self.ui.optionStrategyTable.removeRow(self.ui.optionStrategyTable.currentRow())
+
+    
+    def refreshOpstra(self):
+        i = 0
+        if i < self.ui.optionStrategyTable.rowCount():
+            lastPrice = getLtp(self.ui.optionStrategyTable.item(i, 0).text())
+            self.ui.optionStrategyTable.setItem(i, 5, QTableWidgetItem(str(lastPrice)))
+            i += 1
+            if not i < self.ui.optionStrategyTable.rowCount():
+                return None
+            return None
+
+    
+    def poolExit(self, poolID, product_type):
+        pass
+    # WARNING: Decompyle incomplete
+
+    
+    def exitPool(self, poolID):
+        pass
+    # WARNING: Decompyle incomplete
+
+    __classcell__ = None
+
+
+def indicatorThread():
+    '''indicatorThread'''
+    currentStrike = ''
+    
+    def __init__(self, panel, exitFlag):
+        threading.Thread.__init__(self)
+        self.panel = panel.ui
+        self.exitFlag = exitFlag
+
+    
+    def run(self):
+        pass
+    # WARNING: Decompyle incomplete
+
+    
+    def checkStatus(self, indicator, indFormat, value, bull, bear):
+        closePrice = 0
+        if "'N'" in indFormat:
+            closePrice = nClose()
+        elif "'NF'" in indFormat:
+            closePrice = nfClose()
+        elif "'BN'" in indFormat:
+            closePrice = bnClose()
+        else:
+            closePrice = bnfClose()
+        if indicator == 'EMA' and indicator == 'SMA' or indicator == 'SUPERTREND':
+            if closePrice > value:
+                return 'BULLISH'
+            return None
+        if None == 'MACD':
+            indFormat = indFormat.replace('macd', 'signal')
+            price = eval(indFormat)
+            if value > price:
+                return 'BULLISH'
+            return None
+        if None == 'UPPER BAND':
+            if closePrice > value:
+                return 'BEARISH'
+        if indicator == 'LOWER BAND':
+            if closePrice < value:
+                return 'BULLISH'
+        if indicator == 'ADX':
+            if value > 25:
+                return 'STRONG TREND'
+            return None
+        if None == 'DI+':
+            indFormat = indFormat.replace('dip', 'dim')
+            price = eval(indFormat)
+            if value > price:
+                return 'BULLISH'
+            return None
+        if None == 'DI-':
+            indFormat = indFormat.replace('dim', 'dip')
+            price = eval(indFormat)
+            if value < price:
+                return 'BULLISH'
+            return None
+        if None == 'CCI' and indicator == 'WILLIAMS%R' or indicator == 'RSI':
+            if value > float(bull):
+                return 'BULLISH'
+            if None < float(bear):
+                return 'BEARISH'
+            if None == 'STOCHASTICS':
+                if value > float(bull):
+                    return 'BEARISH'
+                if None < float(bear):
+                    return 'BULLISH'
+                if None == 'ATR':
+                    if value > float(bull):
+                        return 'VOLATILE'
+                    if None < float(bear):
+                        return 'NOT VOLATILE'
+                    return None
+                if None == 'CHOPPINESS':
+                    if value < 38.2:
+                        return 'STRONG TREND'
+                    if None < float(bear):
+                        return 'WEAK TREND'
+                    return None
+                return None
+
+
+indicatorThread = <NODE:26>(indicatorThread, 'indicatorThread', threading.Thread)
+
+def Strategy():
+    '''Strategy'''
+    currentStrike = ''
+    
+    def __init__(self, panel, exitFlag):
+        threading.Thread.__init__(self)
+        self.parentClass = panel
+        self.panel = panel.ui
+        self.exitFlag = exitFlag
+
+    
+    def run(self):
+        i = 0
+    # WARNING: Decompyle incomplete
+
+    
+    def randomStrike(self, condition, cptype, indexType):
+        curIndex = 'NIFTY'
+        modulas = 50
+        if indexType.startswith('BANKNIFTY'):
+            curIndex = 'BANKNIFTY'
+            modulas = 100
+        ltp = int(float(liveLtp[indexToken[curIndex]]))
+        ltp = ltp - ltp % modulas
+        strike = curIndex + self.panel.expiry.currentText() + cptype + str(ltp)
+        prevLtp = getLtp(strike)
+        reqLtp = 0
+        if '<=' in condition:
+            reqLtp = float(condition[condition.index('<=') + 2:len(condition)])
+        else:
+            reqLtp = float(condition[condition.index('>=') + 2:len(condition)])
+        if cptype == 'C':
+            if prevLtp <= reqLtp:
+                modulas = -modulas
+            elif prevLtp >= reqLtp:
+                modulas = -modulas
+        if prevLtp > reqLtp:
+            if prevLtp >= reqLtp:
+                ltp += modulas
+                strike = curIndex + self.panel.expiry.currentText() + cptype + str(ltp)
+                prevLtp = getLtp(strike)
+                if prevLtp >= reqLtp or '>=' in condition:
+                    ltp = ltp - modulas
+                elif prevLtp < reqLtp:
+                    if prevLtp <= reqLtp:
+                        ltp += modulas
+                        strike = curIndex + self.panel.expiry.currentText() + cptype + str(ltp)
+                        prevLtp = getLtp(strike)
+                        if prevLtp <= reqLtp or '<=' in condition:
+                            ltp = ltp - modulas
+        return curIndex + self.panel.expiry.currentText() + cptype + str(ltp)
+
+
+Strategy = <NODE:26>(Strategy, 'Strategy', threading.Thread)
+
+def pnl():
+    '''pnl'''
+    
+    def __init__(self, panel, exitFlag):
+        threading.Thread.__init__(self)
+        self.superClass = panel
+        self.panel = panel.ui
+        self.exitFlag = exitFlag
+
+    
+    def run(self):
+        if self.exitFlag == True:
+            return None
+        profit = None
+        overallProfit = 0
+    # WARNING: Decompyle incomplete
+
+    
+    def exitOrder(self, trantype, name, qty, limit, buffer, ltp, exType, cptype, ordType):
+        self.panel.frame.hide()
+        price_type = 'MKT'
+        price = 0
+        if trantype == 'B':
+            trantype = 'S'
+        else:
+            trantype = 'B'
+        if limit == True and trantype == 'B':
+            price_type = 'LMT'
+            price = ltp - float(buffer)
+        elif limit == True and trantype == 'S':
+            price_type = 'LMT'
+            price = ltp + float(buffer)
+        freeze = 1800
+        if name.startswith('BANKNIFTY'):
+            freeze = 900
+        bal = qty % freeze
+        n = int(qty / freeze)
+        i = 0
+        if i < n:
+            ret = api.place_order(trantype, ordType, 'NFO', name, freeze, 0, price_type, price, None, 'DAY', 'manual', **('buy_or_sell', 'product_type', 'exchange', 'tradingsymbol', 'quantity', 'discloseqty', 'price_type', 'price', 'trigger_price', 'retention', 'remarks'))
+            i += 1
+            if i < n or bal > 0:
+                ret = api.place_order(trantype, ordType, 'NFO', name, bal, 0, price_type, price, None, 'DAY', 'manual', **('buy_or_sell', 'product_type', 'exchange', 'tradingsymbol', 'quantity', 'discloseqty', 'price_type', 'price', 'trigger_price', 'retention', 'remarks'))
+        restartPnlTable = True
+        if exType == 'TARGET' and cptype == 'CE' and self.panel.checkBox_2.isChecked() == True:
+            self.refreshStratTable(cptype)
+        if exType == 'TARGET' and cptype == 'PE' and self.panel.checkBox_4.isChecked() == True:
+            self.refreshStratTable(cptype)
+        if exType == 'SL' and cptype == 'CE' and self.panel.checkBox.isChecked() == True:
+            self.refreshStratTable(cptype)
+        if exType == 'SL' or cptype == 'PE' or self.panel.checkBox_3.isChecked() == True:
+            self.refreshStratTable(cptype)
+            return None
+        return None
+        return None
+
+    
+    def refreshStratTable(self, cptype):
+        i = 0
+        if i < len(controls['ALL_STRAT']):
+            if controls['ALL_STRAT'][i]['cptype'] == cptype:
+                controls['ALL_STRAT'][i]['active'] = True
+            i += 1
+            if not i < len(controls['ALL_STRAT']):
+                return None
+            return None
+
+    
+    def refreshPnlTable(self):
+        pass
+    # WARNING: Decompyle incomplete
+
+    
+    def exitAll(self, panel):
+        global restartPnlTable
+        pass
+    # WARNING: Decompyle incomplete
+
+    
+    def checkIndex(self, cptype, target, side, selectedIndex):
+        if cptype == 'CE' and side == 'B':
+            if float(liveLtp[indexToken[selectedIndex]]) >= target:
+                return True
+            return None
+        if None == 'CE' and side == 'S':
+            if float(liveLtp[indexToken[selectedIndex]]) <= target:
+                return True
+            return None
+        if None == 'PE' and side == 'B':
+            if float(liveLtp[indexToken[selectedIndex]]) <= target:
+                return True
+            return None
+        if None == 'PE' or side == 'S':
+            if float(liveLtp[indexToken[selectedIndex]]) >= target:
+                return True
+            return None
+        return None
+
+    
+    def checkStrike(self, cptype, target, ltp, avg, side, selectedIndex):
+        if side == 'B':
+            if ltp >= target:
+                return True
+            return None
+        if None == 'S':
+            if ltp <= target:
+                return True
+            return None
+
+    
+    def checkIndexSl(self, cptype, target, side, selectedIndex):
+        if cptype == 'CE' and side == 'B':
+            if float(liveLtp[indexToken[selectedIndex]]) <= target:
+                return True
+            return None
+        if None == 'CE' and side == 'S':
+            if float(liveLtp[indexToken[selectedIndex]]) >= target:
+                return True
+            return None
+        if None == 'PE' and side == 'B':
+            if float(liveLtp[indexToken[selectedIndex]]) >= target:
+                return True
+            return None
+        if None == 'PE' or side == 'S':
+            if float(liveLtp[indexToken[selectedIndex]]) <= target:
+                return True
+            return None
+        return None
+
+    
+    def checkStrikeSl(self, cptype, target, ltp, avg, side, selectedIndex):
+        if side == 'B':
+            if ltp <= target:
+                return True
+            return None
+        if None == 'S':
+            if ltp >= target:
+                return True
+            return None
+
+
+pnl = <NODE:26>(pnl, 'pnl', threading.Thread)
+
+def ceLtp():
+    error = False
+    
+    try:
+        lastPrice = getLtp(strategyControl.currentStrike)
+    finally:
+        return None
+        error = True
+        return None
+
+
+
+def peLtp():
+    
+    try:
+        lastPrice = getLtp(strategyControl.currentStrike)
+    finally:
+        return None
+        error = True
+        return None
+
+
+
+def nClose():
+    
+    try:
+        lastPrice = float(liveLtp[indexToken['NIFTY']])
+    finally:
+        return None
+        return None
+
+
+
+def bnClose():
+    
+    try:
+        lastPrice = float(liveLtp[indexToken['BANKNIFTY']])
+    finally:
+        return None
+        return None
+
+
+
+def nfClose():
+    
+    try:
+        lastPrice = float(liveLtp[indexToken['NIFTY FUT']])
+    finally:
+        return None
+        return None
+
+
+
+def bnfClose():
+    
+    try:
+        lastPrice = float(liveLtp[indexToken['BANKNIFTY FUT']])
+    finally:
+        return None
+        return None
+
+
+
+def parseData(index, timeframe):
+    formats = '%d-%m-%Y %H:%M:%S'
+    ind = {
+        'N': 'NIFTY',
+        'BN': 'BANKNIFTY',
+        'NF': 'NIFTY FUT',
+        'BNF': 'BANKNIFTY FUT' }
+    exchange = 'NFO'
+    if index == 'N' or index == 'BN':
+        exchange = 'NSE'
+# WARNING: Decompyle incomplete
+
+
+def rsi(ind, tf, period):
+    finData = parseData(ind, tf)
+    length = len(finData) - 1
+    avgGain = 0
+    avgLoss = 0
+    i = 0
+    if i < period:
+        if float(finData[i + 1]['intc']) > float(finData[i]['intc']):
+            avgGain += float(finData[i + 1]['intc']) - float(finData[i]['intc'])
+        elif float(finData[i + 1]['intc']) < float(finData[i]['intc']):
+            avgLoss += float(finData[i]['intc']) - float(finData[i + 1]['intc'])
+        i += 1
+        if not i < period:
+            avgGain = avgGain / period
+            avgLoss = avgLoss / period
+            i = period
+            if i < length:
+                if float(finData[i + 1]['intc']) > float(finData[i]['intc']):
+                    avgGain = (avgGain * (period - 1) + (float(finData[i + 1]['intc']) - float(finData[i]['intc']))) / period
+                    avgLoss = avgLoss * (period - 1) / period
+                elif float(finData[i + 1]['intc']) < float(finData[i]['intc']):
+                    avgLoss = (avgLoss * (period - 1) + (float(finData[i]['intc']) - float(finData[i + 1]['intc']))) / period
+                    avgGain = avgGain * (period - 1) / period
+                i += 1
+                if not i < length:
+                    rsi = 100 - 100 / (1 + avgGain / avgLoss)
+                    return rsi
+
+
+def sma(ind, tf, period):
+    finData = parseData(ind, tf)
+    i = 1
+    sma = 0
+    if i <= period:
+        sma += float(finData[-i]['intc'])
+        i += 1
+        if not i <= period:
+            return sma / period
+
+
+def ema(ind, tf, period):
+    finData = parseData(ind, tf)
+    length = len(finData) - 1
+    i = 0
+    ema = 0
+    if i < period:
+        ema += float(finData[i]['intc'])
+        i += 1
+        if not i < period:
+            k = 2 / (period + 1)
+            i = period
+            ema = ema / period
+            if i <= length:
+                ema = k * (float(finData[i]['intc']) - ema) + ema
+                i += 1
+                if not i <= length:
+                    return ema
+
+
+def supertrend(ind, tf, period, multiplier):
+    finData = parseData(ind, tf)
+    i = 1
+    length = len(finData)
+    atr = 0
+    bub = 0
+    blb = 0
+    if i < period:
+        atr += max(float(finData[i]['inth']) - float(finData[i]['intl']), float(finData[i]['inth']) - float(finData[i - 1]['intc']), float(finData[i - 1]['intc']) - float(finData[i]['intl']))
+        i += 1
+        if not i < period:
+            atr = atr / 10
+            bub = (float(finData[i - 1]['inth']) + float(finData[i - 1]['intl'])) / 2 + multiplier * atr
+            blb = (float(finData[i - 1]['inth']) + float(finData[i - 1]['intl'])) / 2 - multiplier * atr
+            fub = bub
+            flb = blb
+            pfub = bub
+            pflb = blb
+            pstrend = bub
+            i = period
+            if i < length:
+                atr = (atr * (period - 1) + max(float(finData[i]['inth']) - float(finData[i]['intl']), float(finData[i]['inth']) - float(finData[i - 1]['intc']), float(finData[i - 1]['intc']) - float(finData[i]['intl']))) / period
+                bub = (float(finData[i]['inth']) + float(finData[i]['intl'])) / 2 + multiplier * atr
+                blb = (float(finData[i]['inth']) + float(finData[i]['intl'])) / 2 - multiplier * atr
+                if bub < pfub or float(finData[i - 1]['intc']) > pfub:
+                    fub = bub
+                else:
+                    fub = pfub
+                if blb > pflb or float(finData[i - 1]['intc']) < pflb:
+                    flb = blb
+                else:
+                    flb = pflb
+                if pstrend == pfub and float(finData[i]['intc']) <= fub:
+                    pstrend = fub
+                elif pstrend == pfub and float(finData[i]['intc']) >= fub:
+                    pstrend = flb
+                elif pstrend == pflb and float(finData[i]['intc']) >= flb:
+                    pstrend = flb
+                elif pstrend == pflb and float(finData[i]['intc']) <= flb:
+                    pstrend = fub
+                pfub = fub
+                pflb = flb
+                i += 1
+                if not i < length:
+                    return pstrend
+
+
+def macd(ind, tf):
+    finData = parseData(ind, tf)
+    length = len(finData)
+    i = 14
+    ema12 = 0
+    ema26 = 0
+    if i < 26:
+        ema12 += float(finData[i]['intc'])
+        i += 1
+        if not i < 26:
+            i = 0
+            if i < 26:
+                ema26 += float(finData[i]['intc'])
+                i += 1
+                if not i < 26:
+                    ema12 = ema12 / 12
+                    ema26 = ema26 / 26
+                    i = 26
+                    macd = 0
+                    if i < length:
+                        ema12 = 0.153846 * (float(finData[i]['intc']) - ema12) + ema12
+                        ema26 = 0.0740741 * (float(finData[i]['intc']) - ema26) + ema26
+                        macd = ema12 - ema26
+                        i += 1
+                        if not i < length:
+                            return macd
+
+
+def signal(ind, tf):
+    finData = parseData(ind, tf)
+    length = len(finData)
+    i = 14
+    ema12 = 0
+    ema26 = 0
+    if i < 26:
+        ema12 += float(finData[i]['intc'])
+        i += 1
+        if not i < 26:
+            i = 0
+            if i < 26:
+                ema26 += float(finData[i]['intc'])
+                i += 1
+                if not i < 26:
+                    ema12 = ema12 / 12
+                    ema26 = ema26 / 26
+                    i = 26
+                    macd = 0
+                    macdArr = []
+                    if i < length:
+                        ema12 = 0.153846 * (float(finData[i]['intc']) - ema12) + ema12
+                        ema26 = 0.0740741 * (float(finData[i]['intc']) - ema26) + ema26
+                        macd = ema12 - ema26
+                        macdArr.append(macd)
+                        i += 1
+                        if not i < length:
+                            i = 0
+                            signal = 0
+                            if i < 9:
+                                signal += macdArr[i]
+                                i += 1
+                                if not i < 9:
+                                    signal = signal / 9
+                                    if i < len(macdArr):
+                                        signal = 0.2 * (macdArr[i] - signal) + signal
+                                        i += 1
+                                        if not i < len(macdArr):
+                                            return signal
+
+
+def dip(ind, tf):
+    finData = parseData(ind, tf)
+    length = len(finData)
+    i = 1
+    dmPlus = 0
+    dmMinus = 0
+    avgDp = 0
+    avgDm = 0
+    atr = 0
+    if i < 14:
+        dmPlus = float(finData[i]['inth']) - float(finData[i - 1]['inth'])
+        dmMinus = float(finData[i - 1]['intl']) - float(finData[i]['intl'])
+        if dmPlus < 0 and dmMinus < 0:
+            dmPlus = 0
+            dmMinus = 0
+        elif dmPlus > dmMinus:
+            dmMinus = 0
+        elif dmMinus > dmPlus:
+            dmPlus = 0
+        avgDp += dmPlus
+        avgDm += dmMinus
+        atr += max(float(finData[i]['inth']) - float(finData[i]['intl']), float(finData[i]['inth']) - float(finData[i - 1]['intc']), float(finData[i - 1]['intc']) - float(finData[i]['intl']))
+        i += 1
+        if not i < 14:
+            avgDp = avgDp / 14
+            avgDm = avgDm / 14
+            atr = atr / 14
+            adx = (avgDp - avgDm) / (avgDp + avgDm)
+            if adx < 0:
+                adx = -adx
+    avgAdx = adx
+    adxIndex = i + 14
+    if i < length:
+        dmPlus = float(finData[i]['inth']) - float(finData[i - 1]['inth'])
+        dmMinus = float(finData[i - 1]['intl']) - float(finData[i]['intl'])
+        if dmPlus < 0 and dmMinus < 0:
+            dmPlus = 0
+            dmMinus = 0
+        elif dmPlus > dmMinus:
+            dmMinus = 0
+        elif dmMinus > dmPlus:
+            dmPlus = 0
+        avgDp = (avgDp * 13 + dmPlus) / 14
+        avgDm = (avgDm * 13 + dmMinus) / 14
+        atr = (atr * 13 + max(float(finData[i]['inth']) - float(finData[i]['intl']), float(finData[i]['inth']) - float(finData[i - 1]['intc']), float(finData[i - 1]['intc']) - float(finData[i]['intl']))) / 14
+        adx = (avgDp - avgDm) / (avgDp + avgDm)
+        if adx < 0:
+            adx = -1 * adx
+        if i < adxIndex:
+            avgAdx += adx
+        elif i == adxIndex:
+            avgAdx += adx
+            avgAdx = avgAdx / 14
+        else:
+            avgAdx = (avgAdx * 13 + adx) / 14
+        i += 1
+        if not i < length:
+            return (avgDp / atr) * 100
+
+
+def dim(ind, tf):
+    finData = parseData(ind, tf)
+    length = len(finData)
+    i = 1
+    dmPlus = 0
+    dmMinus = 0
+    avgDp = 0
+    avgDm = 0
+    atr = 0
+    if i < 14:
+        dmPlus = float(finData[i]['inth']) - float(finData[i - 1]['inth'])
+        dmMinus = float(finData[i - 1]['intl']) - float(finData[i]['intl'])
+        if dmPlus < 0 and dmMinus < 0:
+            dmPlus = 0
+            dmMinus = 0
+        elif dmPlus > dmMinus:
+            dmMinus = 0
+        elif dmMinus > dmPlus:
+            dmPlus = 0
+        avgDp += dmPlus
+        avgDm += dmMinus
+        atr += max(float(finData[i]['inth']) - float(finData[i]['intl']), float(finData[i]['inth']) - float(finData[i - 1]['intc']), float(finData[i - 1]['intc']) - float(finData[i]['intl']))
+        i += 1
+        if not i < 14:
+            avgDp = avgDp / 14
+            avgDm = avgDm / 14
+            atr = atr / 14
+            adx = (avgDp - avgDm) / (avgDp + avgDm)
+            if adx < 0:
+                adx = -adx
+    avgAdx = adx
+    adxIndex = i + 14
+    if i < length:
+        dmPlus = float(finData[i]['inth']) - float(finData[i - 1]['inth'])
+        dmMinus = float(finData[i - 1]['intl']) - float(finData[i]['intl'])
+        if dmPlus < 0 and dmMinus < 0:
+            dmPlus = 0
+            dmMinus = 0
+        elif dmPlus > dmMinus:
+            dmMinus = 0
+        elif dmMinus > dmPlus:
+            dmPlus = 0
+        avgDp = (avgDp * 13 + dmPlus) / 14
+        avgDm = (avgDm * 13 + dmMinus) / 14
+        atr = (atr * 13 + max(float(finData[i]['inth']) - float(finData[i]['intl']), float(finData[i]['inth']) - float(finData[i - 1]['intc']), float(finData[i - 1]['intc']) - float(finData[i]['intl']))) / 14
+        adx = (avgDp - avgDm) / (avgDp + avgDm)
+        if adx < 0:
+            adx = -1 * adx
+        if i < adxIndex:
+            avgAdx += adx
+        elif i == adxIndex:
+            avgAdx += adx
+            avgAdx = avgAdx / 14
+        else:
+            avgAdx = (avgAdx * 13 + adx) / 14
+        i += 1
+        if not i < length:
+            return (avgDm / atr) * 100
+
+
+def adx(ind, tf):
+    finData = parseData(ind, tf)
+    length = len(finData)
+    i = 1
+    dmPlus = 0
+    dmMinus = 0
+    avgDp = 0
+    avgDm = 0
+    atr = 0
+    if i < 14:
+        dmPlus = float(finData[i]['inth']) - float(finData[i - 1]['inth'])
+        dmMinus = float(finData[i - 1]['intl']) - float(finData[i]['intl'])
+        if dmPlus < 0 and dmMinus < 0:
+            dmPlus = 0
+            dmMinus = 0
+        elif dmPlus > dmMinus:
+            dmMinus = 0
+        elif dmMinus > dmPlus:
+            dmPlus = 0
+        avgDp += dmPlus
+        avgDm += dmMinus
+        atr += max(float(finData[i]['inth']) - float(finData[i]['intl']), float(finData[i]['inth']) - float(finData[i - 1]['intc']), float(finData[i - 1]['intc']) - float(finData[i]['intl']))
+        i += 1
+        if not i < 14:
+            avgDp = avgDp / 14
+            avgDm = avgDm / 14
+            atr = atr / 14
+            adx = (avgDp - avgDm) / (avgDp + avgDm)
+            if adx < 0:
+                adx = -adx
+    avgAdx = adx
+    adxIndex = i + 14
+    if i < length:
+        dmPlus = float(finData[i]['inth']) - float(finData[i - 1]['inth'])
+        dmMinus = float(finData[i - 1]['intl']) - float(finData[i]['intl'])
+        if dmPlus < 0 and dmMinus < 0:
+            dmPlus = 0
+            dmMinus = 0
+        elif dmPlus > dmMinus:
+            dmMinus = 0
+        elif dmMinus > dmPlus:
+            dmPlus = 0
+        avgDp = (avgDp * 13 + dmPlus) / 14
+        avgDm = (avgDm * 13 + dmMinus) / 14
+        atr = (atr * 13 + max(float(finData[i]['inth']) - float(finData[i]['intl']), float(finData[i]['inth']) - float(finData[i - 1]['intc']), float(finData[i - 1]['intc']) - float(finData[i]['intl']))) / 14
+        adx = (avgDp - avgDm) / (avgDp + avgDm)
+        if adx < 0:
+            adx = -1 * adx
+        if i < adxIndex:
+            avgAdx += adx
+        elif i == adxIndex:
+            avgAdx += adx
+            avgAdx = avgAdx / 14
+        else:
+            avgAdx = (avgAdx * 13 + adx) / 14
+        i += 1
+        if not i < length:
+            return avgAdx * 100
+
+
+def uBol(ind, tf):
+    finData = parseData(ind, tf)
+    movAvg = 0
+    i = 1
+    if i <= 20:
+        movAvg += float(finData[-i]['intc'])
+        i += 1
+        if not i <= 20:
+            movAvg = movAvg / 20
+            i = 1
+            sum = 0
+            if i <= 20:
+                sum += (float(finData[-i]['intc']) - movAvg) ** 2
+                i += 1
+                if not i <= 20:
+                    sum = sum / 20
+                    sum = math.sqrt(sum)
+                    sum = movAvg + sum * 2
+                    return sum
+
+
+def dBol(ind, tf):
+    finData = parseData(ind, tf)
+    movAvg = 0
+    i = 1
+    if i <= 20:
+        movAvg += float(finData[-i]['intc'])
+        i += 1
+        if not i <= 20:
+            movAvg = movAvg / 20
+            i = 1
+            sum = 0
+            if i <= 20:
+                sum += (float(finData[-i]['intc']) - movAvg) ** 2
+                i += 1
+                if not i <= 20:
+                    sum = sum / 20
+                    sum = math.sqrt(sum)
+                    sum = movAvg - sum * 2
+                    return sum
+
+
+def mBol(ind, tf):
+    return sma(ind, tf, 20)
+
+
+def volSMA(ind, tf, period):
+    if ind == 'NF' or ind == 'BNF':
+        finData = parseData(ind, tf)
+        i = 1
+        avg = 0
+        if i <= period:
+            avg += int(finData[-i]['v']) - int(finData[-i - 1]['v'])
+            i += 1
+            if not i <= period:
+                return avg / period
+            return None
+
+
+def volEMA(ind, tf, period):
+    if ind == 'NF' or ind == 'BNF':
+        finData = parseData(ind, tf)
+        length = len(finData)
+        i = 1
+        avg = 0
+        if i <= period:
+            avg += int(finData[i]['v']) - int(finData[i - 1]['v'])
+            i += 1
+            if not i <= period:
+                k = 2 / (period + 1)
+                avg = avg / period
+                if i < length:
+                    avg = k * (int(finData[i]['v']) - int(finData[i - 1]['v']) - avg) + avg
+                    i += 1
+                    if not i < length:
+                        return avg
+                    return None
+
+
+def vwap(ind, tf):
+    if ind == 'NF' or ind == 'BNF':
+        finData = parseData(ind, tf)
+        date = finData[-1]['time'][0:10] + ' 09:15:00'
+        length = len(finData)
+        i = 1
+        typPrice = 0
+        volu = 0
+        if i < length:
+            if finData[-i]['time'] == date:
+                typPrice += int(finData[-i]['v']) * ((float(finData[-i]['inth']) + float(finData[-i]['intl']) + float(finData[-i]['intc'])) / 3)
+                volu += int(finData[-i]['v'])
+                return typPrice / volu
+            None += (int(finData[-i]['v']) - int(finData[-i - 1]['v'])) * ((float(finData[-i]['inth']) + float(finData[-i]['intl']) + float(finData[-i]['intc'])) / 3)
+            volu += int(finData[-i]['v']) - int(finData[-i - 1]['v'])
+            i += 1
+            if not i < length:
+                return typPrice / volu
+            return None
+
+
+def williams(ind, tf):
+    finData = parseData(ind, tf)
+    highestHigh = float(finData[-1]['inth'])
+    lowestLow = float(finData[-1]['intl'])
+    i = 2
+    if i <= 14:
+        if float(finData[-i]['inth']) > highestHigh:
+            highestHigh = float(finData[-i]['inth'])
+        if float(finData[-i]['intl']) < lowestLow:
+            lowestLow = float(finData[-i]['intl'])
+        i += 1
+        if not i <= 14:
+            highestHigh = ((highestHigh - float(finData[-1]['intc'])) / (highestHigh - lowestLow)) * -100
+            return highestHigh
+
+
+def cci(ind, tf, period):
+    finData = parseData(ind, tf)
+    i = 1
+    typPrice = 0
+    Mdev = 0
+    if i <= 20:
+        typPrice += (float(finData[-i]['inth']) + float(finData[-i]['intl']) + float(finData[-i]['intc'])) / 3
+        i += 1
+        if not i <= 20:
+            typPrice = typPrice / 20
+            i = 1
+            if i <= 20:
+                Mdev += abs((float(finData[-i]['inth']) + float(finData[-i]['intl']) + float(finData[-i]['intc'])) / 3 - typPrice)
+                i += 1
+                if not i <= 20:
+                    Mdev = Mdev / 20
+                    typPrice = (abs((float(finData[-1]['inth']) + float(finData[-1]['intl']) + float(finData[-1]['intc'])) / 3) - typPrice) / 0.015 * Mdev
+                    return typPrice
+
+
+def atr(ind, tf, period):
+    finData = parseData(ind, tf)
+    length = len(finData)
+    i = 1
+    atr = 0
+    if i < period:
+        atr += max(float(finData[i]['inth']) - float(finData[i]['intl']), float(finData[i]['inth']) - float(finData[i - 1]['intc']), float(finData[i - 1]['intc']) - float(finData[i]['intl']))
+        i += 1
+        if not i < period:
+            atr = atr / period
+            if i < length:
+                atr = (atr * (period - 1) + max(float(finData[i]['inth']) - float(finData[i]['intl']), float(finData[i]['inth']) - float(finData[i - 1]['intc']), float(finData[i - 1]['intc']) - float(finData[i]['intl']))) / 14
+                i += 1
+                if not i < length:
+                    return atr
+
+
+def chop(ind, tf, period):
+    finData = parseData(ind, tf)
+    length = len(finData)
+    i = 1
+    maxHigh = float(finData[-1]['inth'])
+    minLow = float(finData[-1]['intl'])
+    atr = 0
+    if i <= period:
+        atr += max(float(finData[-i]['inth']) - float(finData[-i]['intl']), float(finData[-i]['inth']) - float(finData[-i - 1]['intc']), float(finData[-i - 1]['intc']) - float(finData[-i]['intl']))
+        if float(finData[-i]['inth']) > maxHigh:
+            maxHigh = float(finData[-i]['inth'])
+        if float(finData[-i]['intl']) < minLow:
+            minLow = float(finData[-i]['intl'])
+        i += 1
+        if not i <= period:
+            ci = 100 * math.log(atr / (maxHigh - minLow), 10) / math.log(period, 10)
+            return ci
+
+
+def stoch(ind, tf, period):
+    finData = parseData(ind, tf)
+    i = 1
+    maxHigh = float(finData[-1]['inth'])
+    minLow = float(finData[-1]['intl'])
+    if i <= period:
+        if float(finData[-i]['inth']) > maxHigh:
+            maxHigh = float(finData[-i]['inth'])
+        if float(finData[-i]['intl']) < minLow:
+            minLow = float(finData[-i]['intl'])
+        i += 1
+        if not i <= period:
+            sValue = ((float(finData[-1]['intc']) - minLow) / (maxHigh - minLow)) * 100
+            return sValue
+
+
+def close(ind, tf, period):
+    finData = parseData(ind, tf)
+    return float(finData[period - 1]['intc'])
+
+
+def open(ind, tf, period):
+    finData = parseData(ind, tf)
+    return float(finData[period - 1]['into'])
+
+
+def high(ind, tf, period):
+    finData = parseData(ind, tf)
+    return float(finData[period - 1]['inth'])
+
+
+def low(ind, tf, period):
+    finData = parseData(ind, tf)
+    return float(finData[period - 1]['intl'])
+
+
+def getLtp(strike):
+    ltp = 0
+    exch = 'NFO'
+    if strike in allTokens:
+        ret = api.get_quotes(exch, allTokens[strike], **('exchange', 'token'))
+        token = allTokens[strike]
+        ltp = float(ret['lp'])
+        return ltp
+    
+    try:
+        ret = api.searchscrip(exch, strike, **('exchange', 'searchtext'))
+        if ret != None:
+            symbols = ret['values']
+            for symbol in symbols:
+                allTokens[strike] = symbol['token']
+                token = allTokens[strike]
+                ret = api.get_quotes(exch, token, **('exchange', 'token'))
+                ltp = float(ret['lp'])
+            else:
+                return ltp
+            return ltp
+        error = True
+        time.sleep(0.1)
+        continue
+
+
+app = QApplication(sys.argv)
+welcome = WelcomeScreen()
+widget = QtWidgets.QStackedWidget()
+widget.addWidget(welcome)
+widget.setFixedHeight(700)
+widget.setFixedWidth(1041)
+widget.show()
+
+try:
+    sys.exit(app.exec_())
+finally:
+    return None
+    print('Exiting')
+    return None
+
